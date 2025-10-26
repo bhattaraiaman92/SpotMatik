@@ -544,7 +544,7 @@ const SpotterTMLOptimizer = () => {
             rel="noopener noreferrer"
             className="text-gray-500 hover:text-ts-orange-400 text-sm transition-colors underline"
           >
-            Click here to get the Master Prompt
+            👉 Click here to get the Master LLM Prompt!
           </a>
         </div>
       </div>
