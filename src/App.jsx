@@ -81,8 +81,12 @@ const SpotterTMLOptimizer = () => {
         {/* Header with ThoughtSpot branding */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="bg-ts-orange-500 p-3 rounded-xl shadow-lg shadow-ts-orange-500/20">
-              <Dog className="w-10 h-10 text-white" />
+            <div className="bg-ts-orange-500 p-1 rounded-full shadow-lg shadow-ts-orange-500/20 w-12 h-12 flex items-center justify-center">
+              <img 
+                src="/spotmatik-logo.png" 
+                alt="SpotMatik Logo" 
+                className="w-10 h-10 object-contain"
+              />
             </div>
             <h1 className="text-4xl font-bold text-white">SpotMatik | Semantic Model Optimizer</h1>
           </div>
