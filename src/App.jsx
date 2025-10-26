@@ -279,55 +279,242 @@ const SpotterTMLOptimizer = () => {
                   Download Report
                 </button>
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
+              
+              {/* Primary Metrics */}
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
                 <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
                   <p className="text-sm text-gray-400 mb-1 font-medium">Industry Detected</p>
                   <p className="text-lg font-bold text-white">{results.industry}</p>
+                </div>
+                <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                  <p className="text-sm text-gray-400 mb-1 font-medium">Business Function</p>
+                  <p className="text-lg font-bold text-white">{results.businessFunction}</p>
                 </div>
                 <div className="p-4 bg-ts-orange-500/10 rounded-lg border border-ts-orange-500/30">
                   <p className="text-sm text-ts-orange-400 mb-1 font-medium">Total Columns</p>
                   <p className="text-lg font-bold text-ts-orange-500">{results.totalColumns}</p>
                 </div>
               </div>
+
+              {/* Model Purpose */}
+              <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                <p className="text-sm text-gray-400 mb-2 font-medium">Model Purpose</p>
+                <p className="text-white">{results.modelPurpose}</p>
+              </div>
+
+              {/* Statistics */}
+              {results.statistics && (
+                <div className="grid md:grid-cols-4 gap-4 mt-6">
+                  <div className="p-4 bg-red-900/20 rounded-lg border border-red-500/30">
+                    <p className="text-sm text-red-400 mb-1 font-medium">Missing Descriptions</p>
+                    <p className="text-2xl font-bold text-red-400">{results.statistics.missingDescriptions}</p>
+                  </div>
+                  <div className="p-4 bg-yellow-900/20 rounded-lg border border-yellow-500/30">
+                    <p className="text-sm text-yellow-400 mb-1 font-medium">Abbreviated Names</p>
+                    <p className="text-2xl font-bold text-yellow-400">{results.statistics.abbreviatedNames}</p>
+                  </div>
+                  <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
+                    <p className="text-sm text-blue-400 mb-1 font-medium">Needing Synonyms</p>
+                    <p className="text-2xl font-bold text-blue-400">{results.statistics.needingSynonyms}</p>
+                  </div>
+                  <div className="p-4 bg-purple-900/20 rounded-lg border border-purple-500/30">
+                    <p className="text-sm text-purple-400 mb-1 font-medium">Impact Level</p>
+                    <p className="text-2xl font-bold text-purple-400">{results.statistics.impactLevel}</p>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Industry Context */}
+            {results.industryContext && (
+              <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
+                <h2 className="text-2xl font-bold text-white mb-4">📚 Industry Context</h2>
+                <p className="text-gray-300 leading-relaxed">{results.industryContext}</p>
+              </div>
+            )}
 
             <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
               <h2 className="text-2xl font-bold text-white mb-6">🎯 Model-Level Recommendations</h2>
-              <div className="space-y-3">
-                <div className="p-4 bg-red-900/20 rounded-lg border-l-4 border-red-500 shadow-sm">
-                  <p className="text-sm text-red-400 mb-1 font-semibold">Current</p>
-                  <p className="text-gray-300">{results.modelDescription.current}</p>
-                </div>
-                <div className="p-4 bg-ts-teal-500/10 rounded-lg border-l-4 border-ts-teal-500 shadow-sm">
-                  <p className="text-sm text-ts-teal-400 mb-1 font-semibold">Recommended</p>
-                  <p className="text-gray-300">{results.modelDescription.recommended}</p>
+              
+              {/* Model Description */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-ts-orange-400 mb-3">Model Description</h3>
+                <div className="space-y-3">
+                  <div className="p-4 bg-red-900/20 rounded-lg border-l-4 border-red-500 shadow-sm">
+                    <p className="text-sm text-red-400 mb-1 font-semibold">Current</p>
+                    <p className="text-gray-300">{results.modelDescription.current}</p>
+                  </div>
+                  <div className="p-4 bg-ts-teal-500/10 rounded-lg border-l-4 border-ts-teal-500 shadow-sm">
+                    <p className="text-sm text-ts-teal-400 mb-1 font-semibold">Recommended</p>
+                    <p className="text-gray-300">{results.modelDescription.recommended}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Model Instructions */}
+              {results.modelInstructions && results.modelInstructions.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-ts-orange-400 mb-3">Model Instructions (Universal Rules)</h3>
+                  <div className="space-y-2">
+                    {results.modelInstructions.map((instruction, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-4 bg-gray-800 rounded-lg border border-gray-700">
+                        <span className="flex-shrink-0 w-6 h-6 bg-ts-orange-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                          {idx + 1}
+                        </span>
+                        <p className="text-gray-300">{instruction}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="bg-gray-900 rounded-xl shadow-2xl border border-red-500/30 p-8">
-              <h2 className="text-2xl font-bold text-red-400 mb-6">🔴 CRITICAL - Do First</h2>
-              <div className="space-y-6">
-                {results.columnRecommendations.critical.map((col, idx) => (
-                  <div key={idx} className="p-6 border-2 border-red-500/30 rounded-lg bg-red-900/10 shadow-md hover:shadow-lg hover:border-red-500/50 transition-all">
-                    <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
-                    <p className="text-gray-300 mb-4"><span className="font-semibold text-red-400">Issue:</span> {col.issue}</p>
-                    {col.recommendations.name && (
-                      <div className="mb-3">
-                        <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
-                        <p className="text-white font-medium">{col.recommendations.name}</p>
-                      </div>
-                    )}
-                    {col.recommendations.description && (
-                      <div className="mb-3">
-                        <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
-                        <p className="text-gray-300">{col.recommendations.description}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
+            {/* CRITICAL Priority */}
+            {results.columnRecommendations.critical && results.columnRecommendations.critical.length > 0 && (
+              <div className="bg-gray-900 rounded-xl shadow-2xl border border-red-500/30 p-8">
+                <h2 className="text-2xl font-bold text-red-400 mb-6">🔴 CRITICAL - Do First</h2>
+                <div className="space-y-6">
+                  {results.columnRecommendations.critical.map((col, idx) => (
+                    <div key={idx} className="p-6 border-2 border-red-500/30 rounded-lg bg-red-900/10 shadow-md hover:shadow-lg hover:border-red-500/50 transition-all">
+                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
+                      <p className="text-gray-300 mb-4"><span className="font-semibold text-red-400">Issue:</span> {col.issue}</p>
+                      
+                      {col.recommendations.name && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
+                          <p className="text-white font-medium">{col.recommendations.name}</p>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.description && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
+                          <p className="text-gray-300">{col.recommendations.description}</p>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.synonyms && col.recommendations.synonyms.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-2">Suggested Synonyms:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {col.recommendations.synonyms.map((syn, synIdx) => (
+                              <span key={synIdx} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm border border-gray-700">
+                                {syn}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.rationale && (
+                        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border-l-4 border-ts-teal-500">
+                          <p className="text-sm text-ts-teal-400 font-semibold mb-1">Why This Matters:</p>
+                          <p className="text-gray-300 text-sm">{col.recommendations.rationale}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* IMPORTANT Priority */}
+            {results.columnRecommendations.important && results.columnRecommendations.important.length > 0 && (
+              <div className="bg-gray-900 rounded-xl shadow-2xl border border-yellow-500/30 p-8">
+                <h2 className="text-2xl font-bold text-yellow-400 mb-6">🟡 IMPORTANT - Do Soon</h2>
+                <div className="space-y-6">
+                  {results.columnRecommendations.important.map((col, idx) => (
+                    <div key={idx} className="p-6 border-2 border-yellow-500/30 rounded-lg bg-yellow-900/10 shadow-md hover:shadow-lg hover:border-yellow-500/50 transition-all">
+                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
+                      <p className="text-gray-300 mb-4"><span className="font-semibold text-yellow-400">Issue:</span> {col.issue}</p>
+                      
+                      {col.recommendations.name && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
+                          <p className="text-white font-medium">{col.recommendations.name}</p>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.description && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
+                          <p className="text-gray-300">{col.recommendations.description}</p>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.synonyms && col.recommendations.synonyms.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-2">Suggested Synonyms:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {col.recommendations.synonyms.map((syn, synIdx) => (
+                              <span key={synIdx} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm border border-gray-700">
+                                {syn}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.rationale && (
+                        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border-l-4 border-ts-teal-500">
+                          <p className="text-sm text-ts-teal-400 font-semibold mb-1">Why This Matters:</p>
+                          <p className="text-gray-300 text-sm">{col.recommendations.rationale}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* NICE TO HAVE Priority */}
+            {results.columnRecommendations.niceToHave && results.columnRecommendations.niceToHave.length > 0 && (
+              <div className="bg-gray-900 rounded-xl shadow-2xl border border-green-500/30 p-8">
+                <h2 className="text-2xl font-bold text-green-400 mb-6">🟢 NICE TO HAVE - When Time Permits</h2>
+                <div className="space-y-6">
+                  {results.columnRecommendations.niceToHave.map((col, idx) => (
+                    <div key={idx} className="p-6 border-2 border-green-500/30 rounded-lg bg-green-900/10 shadow-md hover:shadow-lg hover:border-green-500/50 transition-all">
+                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
+                      <p className="text-gray-300 mb-4"><span className="font-semibold text-green-400">Issue:</span> {col.issue}</p>
+                      
+                      {col.recommendations.name && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
+                          <p className="text-white font-medium">{col.recommendations.name}</p>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.description && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
+                          <p className="text-gray-300">{col.recommendations.description}</p>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.synonyms && col.recommendations.synonyms.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-sm text-ts-orange-400 font-semibold mb-2">Suggested Synonyms:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {col.recommendations.synonyms.map((syn, synIdx) => (
+                              <span key={synIdx} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm border border-gray-700">
+                                {syn}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {col.recommendations.rationale && (
+                        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border-l-4 border-ts-teal-500">
+                          <p className="text-sm text-ts-teal-400 font-semibold mb-1">Why This Matters:</p>
+                          <p className="text-gray-300 text-sm">{col.recommendations.rationale}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
               <h2 className="text-2xl font-bold text-white mb-6">🚀 Quick Wins</h2>
