@@ -535,6 +535,18 @@ const SpotterTMLOptimizer = () => {
             </div>
           </div>
         )}
+
+        {/* Footer */}
+        <div className="mt-12 pb-8 text-center">
+          <a
+            href="https://github.com/bhattaraiaman92/SpotMatik/blob/main/master_prompt.txt"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-ts-orange-400 text-sm transition-colors underline"
+          >
+            Click here to get the Master Prompt
+          </a>
+        </div>
       </div>
     </div>
   );
