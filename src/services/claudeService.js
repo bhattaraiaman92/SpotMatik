@@ -1,11 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIService } from './aiService';
-import { SYSTEM_PROMPT, API_CONFIG, AI_PROVIDERS, PROVIDER_INFO } from '../config/apiConfig';
+import { SYSTEM_PROMPT, AI_PROVIDERS, getModelConfig } from '../config/apiConfig';
 
 export class ClaudeService extends AIService {
-  constructor(apiKey, model = null, useProxy = true) {
-    super(apiKey, model);
+  constructor(apiKey, mode = 'standard', useProxy = true) {
+    super(apiKey, mode);
     this.useProxy = useProxy;
+    
+    // Get model configuration for the selected mode
+    this.config = getModelConfig(AI_PROVIDERS.CLAUDE, mode);
     
     // Only initialize direct client if not using proxy
     if (!useProxy) {
@@ -14,32 +17,29 @@ export class ClaudeService extends AIService {
         dangerouslyAllowBrowser: true // Only for client-side usage
       });
     }
-    
-    this.model = model || PROVIDER_INFO[AI_PROVIDERS.CLAUDE].defaultModel;
-    this.config = API_CONFIG[AI_PROVIDERS.CLAUDE];
   }
 
-  async analyzeTML(tmlContent) {
-    try {
-      // Try proxy first if enabled
-      if (this.useProxy) {
-        try {
-          return await this.analyzeWithProxy(tmlContent);
-        } catch (proxyError) {
-          console.warn('Proxy failed, falling back to direct API:', proxyError);
-          // Initialize client for fallback if not already done
-          if (!this.client) {
-            this.client = new Anthropic({
-              apiKey: this.apiKey,
-              dangerouslyAllowBrowser: true
-            });
-          }
+  async callProviderAPI(tmlContent) {
+    // Try proxy first if enabled
+    if (this.useProxy) {
+      try {
+        return await this.callWithProxy(tmlContent);
+      } catch (proxyError) {
+        console.warn('Proxy failed, falling back to direct API:', proxyError);
+        // Initialize client for fallback if not already done
+        if (!this.client) {
+          this.client = new Anthropic({
+            apiKey: this.apiKey,
+            dangerouslyAllowBrowser: true
+          });
         }
       }
+    }
 
-      // Direct API call
+    // Direct API call
+    try {
       const message = await this.client.messages.create({
-        model: this.model,
+        model: this.config.model,
         max_tokens: this.config.maxTokens,
         temperature: this.config.temperature,
         messages: [
@@ -50,14 +50,11 @@ export class ClaudeService extends AIService {
         ]
       });
 
-      // Extract the response
-      const responseText = message.content[0].text;
-      
-      // Use base class method to parse response
-      return this.parseResponse(responseText);
+      // Return the response text
+      return message.content[0].text;
 
     } catch (error) {
-      console.error('Error analyzing TML with Claude:', error);
+      console.error('Error with Claude direct API:', error);
       
       // Handle CORS-specific error
       if (error.status === 401 && error.message && error.message.includes('CORS')) {
@@ -71,11 +68,11 @@ export class ClaudeService extends AIService {
         );
       }
       
-      throw new Error(`Claude analysis failed: ${error.message}`);
+      throw new Error(`Claude API call failed: ${error.message}`);
     }
   }
 
-  async analyzeWithProxy(tmlContent) {
+  async callWithProxy(tmlContent) {
     // Determine proxy URL based on environment
     const proxyUrl = import.meta.env.PROD 
       ? '/api/claude-proxy'
@@ -88,14 +85,14 @@ export class ClaudeService extends AIService {
       },
       body: JSON.stringify({
         apiKey: this.apiKey,
-        model: this.model,
+        model: this.config.model,
         tmlContent: tmlContent,
         systemPrompt: SYSTEM_PROMPT
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || `Proxy request failed with status ${response.status}`);
     }
 
@@ -105,11 +102,8 @@ export class ClaudeService extends AIService {
       throw new Error('Invalid response from proxy');
     }
 
-    // Extract the response text
-    const responseText = data.content[0].text;
-    
-    // Use base class method to parse response
-    return this.parseResponse(responseText);
+    // Return the response text
+    return data.content[0].text;
   }
 }
 

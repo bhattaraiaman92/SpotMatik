@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Dog } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Zap } from 'lucide-react';
 import { AIServiceFactory } from './services/aiServiceFactory';
-import { AI_PROVIDERS, PROVIDER_INFO } from './config/apiConfig';
+import { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES } from './config/apiConfig';
 
 const SpotterTMLOptimizer = () => {
   const [file, setFile] = useState(null);
@@ -10,8 +10,8 @@ const SpotterTMLOptimizer = () => {
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState(AI_PROVIDERS.CLAUDE);
-  const [selectedModel, setSelectedModel] = useState(PROVIDER_INFO[AI_PROVIDERS.CLAUDE].defaultModel);
+  const [selectedProvider, setSelectedProvider] = useState(AI_PROVIDERS.OPENAI);
+  const [selectedMode, setSelectedMode] = useState(MODEL_MODES.STANDARD);
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
 
   const handleFileUpload = (e) => {
@@ -31,7 +31,6 @@ const SpotterTMLOptimizer = () => {
 
   const handleProviderChange = (provider) => {
     setSelectedProvider(provider);
-    setSelectedModel(PROVIDER_INFO[provider].defaultModel);
     setApiKey(''); // Clear API key when changing providers
     setShowApiKeyInput(true);
   };
@@ -52,7 +51,7 @@ const SpotterTMLOptimizer = () => {
     setError('');
 
     try {
-      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedModel);
+      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode);
       const results = await aiService.analyzeTML(tmlContent);
       setResults(results);
     } catch (err) {
@@ -132,20 +131,49 @@ const SpotterTMLOptimizer = () => {
                   </div>
                 </div>
 
-                {/* Model Selection */}
+                {/* Model Mode Selection */}
                 <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Select Model</label>
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all"
-                  >
-                    {PROVIDER_INFO[selectedProvider].models.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">Model Mode</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setSelectedMode(MODEL_MODES.STANDARD)}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        selectedMode === MODEL_MODES.STANDARD
+                          ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                          : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Zap className="w-5 h-5 text-ts-orange-500" />
+                        <span className="font-semibold text-white">Standard</span>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Fast & cost-effective
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 font-mono">
+                        {PROVIDER_INFO[selectedProvider].standardModel}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setSelectedMode(MODEL_MODES.ADVANCED)}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        selectedMode === MODEL_MODES.ADVANCED
+                          ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                          : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="w-5 h-5 text-purple-500" />
+                        <span className="font-semibold text-white">Advanced</span>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        More reasoning power
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 font-mono">
+                        {PROVIDER_INFO[selectedProvider].advancedModel}
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
                 {/* API Key Input */}
@@ -209,7 +237,14 @@ const SpotterTMLOptimizer = () => {
               <p className="text-white font-semibold">
                 {PROVIDER_INFO[selectedProvider].name} configured
               </p>
-              <p className="text-gray-400 text-sm">Model: {selectedModel}</p>
+              <p className="text-gray-400 text-sm">
+                Mode: {selectedMode === MODEL_MODES.STANDARD ? 'Standard' : 'Advanced'} 
+                <span className="text-gray-500 ml-2">
+                  ({selectedMode === MODEL_MODES.STANDARD 
+                    ? PROVIDER_INFO[selectedProvider].standardModel 
+                    : PROVIDER_INFO[selectedProvider].advancedModel})
+                </span>
+              </p>
             </div>
             <button
               onClick={() => setShowApiKeyInput(true)}

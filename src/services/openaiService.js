@@ -1,24 +1,29 @@
 import OpenAI from 'openai';
 import { AIService } from './aiService';
-import { SYSTEM_PROMPT, API_CONFIG, AI_PROVIDERS, PROVIDER_INFO } from '../config/apiConfig';
+import { SYSTEM_PROMPT, AI_PROVIDERS, getModelConfig } from '../config/apiConfig';
 
 export class OpenAIService extends AIService {
-  constructor(apiKey, model = null) {
-    super(apiKey, model);
+  constructor(apiKey, mode = 'standard') {
+    super(apiKey, mode);
+    
+    // Get model configuration for the selected mode
+    this.config = getModelConfig(AI_PROVIDERS.OPENAI, mode);
+    
     this.client = new OpenAI({
       apiKey: apiKey,
       dangerouslyAllowBrowser: true // Only for client-side usage
     });
-    this.model = model || PROVIDER_INFO[AI_PROVIDERS.OPENAI].defaultModel;
-    this.config = API_CONFIG[AI_PROVIDERS.OPENAI];
   }
 
-  async analyzeTML(tmlContent) {
+  async callProviderAPI(tmlContent) {
     try {
       const completion = await this.client.chat.completions.create({
-        model: this.model,
+        model: this.config.model,
         max_tokens: this.config.maxTokens,
         temperature: this.config.temperature,
+        top_p: this.config.topP,
+        presence_penalty: this.config.presencePenalty,
+        frequency_penalty: this.config.frequencyPenalty,
         messages: [
           {
             role: 'system',
@@ -31,15 +36,12 @@ export class OpenAIService extends AIService {
         ]
       });
 
-      // Extract the response
-      const responseText = completion.choices[0].message.content;
-      
-      // Use base class method to parse response
-      return this.parseResponse(responseText);
+      // Return the response text
+      return completion.choices[0].message.content;
 
     } catch (error) {
-      console.error('Error analyzing TML with OpenAI:', error);
-      throw new Error(`OpenAI analysis failed: ${error.message}`);
+      console.error('Error with OpenAI API:', error);
+      throw new Error(`OpenAI API call failed: ${error.message}`);
     }
   }
 }

@@ -1,36 +1,104 @@
 // Supported AI Providers
 export const AI_PROVIDERS = {
-  CLAUDE: 'claude',
   OPENAI: 'openai',
+  CLAUDE: 'claude',
   GEMINI: 'gemini'
 };
 
+// Model modes
+export const MODEL_MODES = {
+  STANDARD: 'standard',
+  ADVANCED: 'advanced'
+};
+
+// Base configuration for each provider with toggleable models
+export const AI_MODELS = {
+  [AI_PROVIDERS.OPENAI]: {
+    models: {
+      standard: 'gpt-4o-mini',  // fast, cheaper
+      advanced: 'gpt-4o'        // slower, more reasoning power
+    },
+    defaults: {
+      temperature: 0.25,
+      topP: 0.9,
+      presencePenalty: 0.0,
+      frequencyPenalty: 0.0,
+      responseFormat: 'json',
+      maxTokens: 12000
+    }
+  },
+  [AI_PROVIDERS.CLAUDE]: {
+    models: {
+      standard: 'claude-3-5-sonnet-20241022',
+      advanced: 'claude-sonnet-4-20250514'
+    },
+    defaults: {
+      temperature: 0.2,
+      topP: 0.9,
+      responseFormat: 'json',
+      maxTokens: 15000
+    }
+  },
+  [AI_PROVIDERS.GEMINI]: {
+    models: {
+      standard: 'gemini-1.5-flash', // fast and cheap
+      advanced: 'gemini-1.5-pro'    // richer reasoning
+    },
+    defaults: {
+      temperature: 0.35,
+      topP: 0.9,
+      responseMimeType: 'application/json',
+      maxTokens: 16000
+    }
+  }
+};
+
+// Provider display information
 export const PROVIDER_INFO = {
   [AI_PROVIDERS.CLAUDE]: {
     name: 'Claude (Anthropic)',
-    models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
-    defaultModel: 'claude-sonnet-4-20250514',
     apiKeyPrefix: 'sk-ant-',
     consoleUrl: 'https://console.anthropic.com/',
-    description: 'Anthropic Claude - Advanced reasoning and analysis'
+    description: 'Anthropic Claude - Advanced reasoning and analysis',
+    standardModel: AI_MODELS[AI_PROVIDERS.CLAUDE].models.standard,
+    advancedModel: AI_MODELS[AI_PROVIDERS.CLAUDE].models.advanced
   },
   [AI_PROVIDERS.OPENAI]: {
     name: 'ChatGPT (OpenAI)',
-    models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'],
-    defaultModel: 'gpt-4o',
     apiKeyPrefix: 'sk-',
     consoleUrl: 'https://platform.openai.com/api-keys',
-    description: 'OpenAI ChatGPT - Versatile and powerful'
+    description: 'OpenAI ChatGPT - Versatile and powerful',
+    standardModel: AI_MODELS[AI_PROVIDERS.OPENAI].models.standard,
+    advancedModel: AI_MODELS[AI_PROVIDERS.OPENAI].models.advanced
   },
   [AI_PROVIDERS.GEMINI]: {
     name: 'Gemini (Google)',
-    models: ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash'],
-    defaultModel: 'gemini-2.0-flash-exp',
     apiKeyPrefix: 'AI',
     consoleUrl: 'https://aistudio.google.com/apikey',
-    description: 'Google Gemini - Fast and efficient'
+    description: 'Google Gemini - Fast and efficient',
+    standardModel: AI_MODELS[AI_PROVIDERS.GEMINI].models.standard,
+    advancedModel: AI_MODELS[AI_PROVIDERS.GEMINI].models.advanced
   }
 };
+
+// Helper to get full config dynamically
+export function getModelConfig(provider, mode = MODEL_MODES.STANDARD) {
+  const base = AI_MODELS[provider];
+  if (!base) throw new Error(`Unsupported provider: ${provider}`);
+
+  const model = base.models[mode] || base.models.standard;
+  return { ...base.defaults, model };
+}
+
+// Simple JSON cleaner
+export function parseJSONSafely(text) {
+  try {
+    const clean = text.replace(/```(json)?/g, '').trim();
+    return JSON.parse(clean);
+  } catch {
+    return null;
+  }
+}
 
 export const SYSTEM_PROMPT = `# Master Prompt: Spotter TML Model Optimizer
 
@@ -265,20 +333,3 @@ Return ONLY valid JSON in this EXACT format (no markdown, no code blocks, just J
 }
 
 CRITICAL: Return ONLY the JSON object, no other text, no markdown formatting, no code blocks.`;
-
-// API Configuration for each provider
-export const API_CONFIG = {
-  [AI_PROVIDERS.CLAUDE]: {
-    maxTokens: 8192,
-    temperature: 0.3
-  },
-  [AI_PROVIDERS.OPENAI]: {
-    maxTokens: 8192,
-    temperature: 0.3
-  },
-  [AI_PROVIDERS.GEMINI]: {
-    maxTokens: 8192,
-    temperature: 0.3
-  }
-};
-

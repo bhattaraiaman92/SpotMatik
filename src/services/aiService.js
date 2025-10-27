@@ -1,23 +1,58 @@
+import { parseJSONSafely } from '../config/apiConfig';
+
 /**
  * Base AI Service Interface
  * All provider-specific services should extend this class
  */
 export class AIService {
-  constructor(apiKey, model = null) {
+  constructor(apiKey, mode = 'standard', maxRetries = 2) {
     if (!apiKey) {
       throw new Error('API key is required');
     }
     this.apiKey = apiKey;
-    this.model = model;
+    this.mode = mode;
+    this.maxRetries = maxRetries;
   }
 
   /**
-   * Analyze TML content using the AI provider
+   * Analyze TML content using the AI provider with retry logic
    * @param {string} tmlContent - The TML file content to analyze
    * @returns {Promise<Object>} - Analysis results in standardized format
    */
   async analyzeTML(tmlContent) {
-    throw new Error('analyzeTML must be implemented by provider-specific service');
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        console.log(`[${this.constructor.name}] Attempt ${attempt}/${this.maxRetries} with mode: ${this.mode}`);
+        
+        const response = await this.callProviderAPI(tmlContent);
+        const json = this.parseResponse(response);
+        
+        if (json) {
+          console.log(`[${this.constructor.name}] Successfully parsed response on attempt ${attempt}`);
+          return json;
+        }
+        
+        throw new Error('Invalid JSON output');
+      } catch (error) {
+        console.warn(`[${this.constructor.name}] Attempt ${attempt} failed: ${error.message}`);
+        
+        if (attempt === this.maxRetries) {
+          throw error;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+
+  /**
+   * Provider-specific API call - must be implemented by subclasses
+   * @param {string} tmlContent - The TML file content to analyze
+   * @returns {Promise<string>} - Raw response text from provider
+   */
+  async callProviderAPI(tmlContent) {
+    throw new Error('callProviderAPI must be implemented by provider-specific service');
   }
 
   /**
@@ -27,7 +62,11 @@ export class AIService {
    */
   parseResponse(responseText) {
     try {
-      // Try to extract JSON from response (handles markdown code blocks, etc.)
+      // First try the safe JSON parser
+      const parsed = parseJSONSafely(responseText);
+      if (parsed) return parsed;
+
+      // Fallback to regex extraction
       let jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No valid JSON found in response');

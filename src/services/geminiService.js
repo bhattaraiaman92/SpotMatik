@@ -1,22 +1,26 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIService } from './aiService';
-import { SYSTEM_PROMPT, API_CONFIG, AI_PROVIDERS, PROVIDER_INFO } from '../config/apiConfig';
+import { SYSTEM_PROMPT, AI_PROVIDERS, getModelConfig } from '../config/apiConfig';
 
 export class GeminiService extends AIService {
-  constructor(apiKey, model = null) {
-    super(apiKey, model);
+  constructor(apiKey, mode = 'standard') {
+    super(apiKey, mode);
+    
+    // Get model configuration for the selected mode
+    this.config = getModelConfig(AI_PROVIDERS.GEMINI, mode);
+    
     this.client = new GoogleGenerativeAI(apiKey);
-    this.model = model || PROVIDER_INFO[AI_PROVIDERS.GEMINI].defaultModel;
-    this.config = API_CONFIG[AI_PROVIDERS.GEMINI];
   }
 
-  async analyzeTML(tmlContent) {
+  async callProviderAPI(tmlContent) {
     try {
       const generativeModel = this.client.getGenerativeModel({ 
-        model: this.model,
+        model: this.config.model,
         generationConfig: {
           maxOutputTokens: this.config.maxTokens,
-          temperature: this.config.temperature
+          temperature: this.config.temperature,
+          topP: this.config.topP,
+          responseMimeType: this.config.responseMimeType
         }
       });
 
@@ -24,14 +28,13 @@ export class GeminiService extends AIService {
       
       const result = await generativeModel.generateContent(prompt);
       const response = await result.response;
-      const responseText = response.text();
       
-      // Use base class method to parse response
-      return this.parseResponse(responseText);
+      // Return the response text
+      return response.text();
 
     } catch (error) {
-      console.error('Error analyzing TML with Gemini:', error);
-      throw new Error(`Gemini analysis failed: ${error.message}`);
+      console.error('Error with Gemini API:', error);
+      throw new Error(`Gemini API call failed: ${error.message}`);
     }
   }
 }
