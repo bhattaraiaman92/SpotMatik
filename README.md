@@ -44,13 +44,18 @@ npm run dev
 - Models: `claude-sonnet-4-20250514`, `claude-3-5-sonnet-20241022`, `claude-3-opus-20240229`
 - Get API key: [console.anthropic.com](https://console.anthropic.com/)
 
+⚠️ **Important Note about Claude**: 
+If your organization has custom retention settings, Claude's API may block direct browser requests due to CORS restrictions. This app includes a backend proxy to work around this limitation. When deployed on Vercel, the proxy is automatically available. If you encounter CORS errors with Claude, please use **OpenAI** or **Gemini** instead, or ensure the app is deployed with the proxy enabled.
+
 ### ChatGPT (OpenAI)
 - Models: `gpt-4o`, `gpt-4-turbo`, `gpt-4`, `gpt-3.5-turbo`
 - Get API key: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- ✅ Fully supports browser-based requests
 
 ### Gemini (Google)
 - Models: `gemini-2.0-flash-exp`, `gemini-1.5-pro`, `gemini-1.5-flash`
 - Get API key: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- ✅ Fully supports browser-based requests
 
 ## Tech Stack
 
@@ -67,3 +72,35 @@ npm run dev
 - \`npm run dev\` - Start development server
 - \`npm run build\` - Build for production
 - \`npm run preview\` - Preview production build
+
+## Deployment
+
+### Deploy to Vercel (Recommended)
+
+This app is optimized for Vercel deployment and includes a serverless proxy for Claude API:
+
+1. Push your code to GitHub
+2. Import the repository in Vercel
+3. Deploy - the proxy will be automatically available at `/api/claude-proxy`
+
+The proxy solves CORS issues with Claude's API by making requests server-side.
+
+### Other Platforms
+
+If deploying to other platforms, you may need to set up a similar backend proxy for Claude API support, or use OpenAI/Gemini which support direct browser requests.
+
+## Troubleshooting
+
+### Claude CORS Error
+
+If you see this error:
+```
+CORS requests are not allowed for this Organization because of custom retention settings
+```
+
+**Solutions:**
+1. **Recommended**: Use OpenAI or Gemini instead - they fully support browser requests
+2. Deploy the app on Vercel (proxy is automatically enabled)
+3. Set up a backend proxy server manually
+
+The app will automatically attempt to use the proxy when available, falling back to direct API calls if needed.

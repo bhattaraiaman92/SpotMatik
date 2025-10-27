@@ -16,11 +16,14 @@ src/
 │   └── apiConfig.js          # Provider configurations and prompts
 ├── services/
 │   ├── aiService.js          # Base service interface (abstract class)
-│   ├── claudeService.js      # Claude/Anthropic implementation
+│   ├── claudeService.js      # Claude/Anthropic implementation (with proxy support)
 │   ├── openaiService.js      # OpenAI/ChatGPT implementation
 │   ├── geminiService.js      # Google Gemini implementation
 │   └── aiServiceFactory.js   # Factory to create service instances
 └── App.jsx                   # Main UI with provider selection
+
+api/
+└── claude-proxy.js           # Vercel serverless function for Claude API proxy
 ```
 
 ## Key Components
@@ -42,6 +45,10 @@ Each provider service extends `AIService` and implements:
 - Uses `@anthropic-ai/sdk`
 - Supports Claude Sonnet and Opus models
 - Implements Anthropic's message API
+- **Proxy Support**: Automatically uses backend proxy to avoid CORS issues
+  - When deployed, requests go through `/api/claude-proxy` (serverless function)
+  - Falls back to direct API calls if proxy unavailable
+  - Solves CORS restrictions for organizations with custom retention settings
 
 **OpenAI Service** (`openaiService.js`)
 - Uses `openai` package
@@ -187,12 +194,45 @@ npm install provider-sdk
 
 That's it! The UI will automatically show the new provider option.
 
+## Claude CORS Issue & Proxy Solution
+
+### The Problem
+Claude's API does not support direct browser (CORS) requests when organizations have custom retention settings enabled. This results in a 401 authentication error with the message:
+```
+CORS requests are not allowed for this Organization because of custom retention settings
+```
+
+### The Solution
+We've implemented a **serverless proxy function** that runs on the backend:
+
+1. **Proxy Function** (`api/claude-proxy.js`)
+   - Vercel serverless function that accepts API requests from the frontend
+   - Makes server-side requests to Claude API (no CORS restrictions)
+   - Returns results to the frontend
+   - User's API key is sent with each request (not stored server-side)
+
+2. **Automatic Proxy Detection** (`claudeService.js`)
+   - Checks if proxy endpoint is available
+   - Automatically uses proxy when deployed
+   - Falls back to direct API calls in development or if proxy fails
+
+3. **Fallback Options**
+   - Users can switch to OpenAI or Gemini (both support browser requests)
+   - Error messages guide users to alternative solutions
+
+### Proxy Security
+- API keys are **never stored** server-side
+- Keys are passed through the proxy to Claude's API
+- Each request includes the user's key
+- Proxy is stateless and doesn't log sensitive data
+
 ## Security Notes
 
 - API keys are stored only in browser session state (not persisted)
-- Keys are only sent to the selected AI provider
+- Keys are only sent to the selected AI provider (or proxy)
 - No server-side storage or logging of API keys
-- `dangerouslyAllowBrowser` flag used for client-side SDK usage (acceptable for this use case)
+- Proxy passes keys directly to Claude API without storing
+- `dangerouslyAllowBrowser` flag used for fallback client-side SDK usage
 
 ## Future Enhancements
 

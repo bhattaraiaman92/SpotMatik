@@ -153,6 +153,17 @@ const SpotterTMLOptimizer = () => {
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
                     API Key for {PROVIDER_INFO[selectedProvider].name}
                   </label>
+                  
+                  {/* Claude CORS Warning */}
+                  {selectedProvider === AI_PROVIDERS.CLAUDE && (
+                    <div className="mb-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                      <p className="text-xs text-blue-300">
+                        ℹ️ <strong>Note:</strong> This app uses a backend proxy for Claude API to avoid CORS issues. 
+                        If you encounter errors in local development, please use <strong>OpenAI</strong> or <strong>Gemini</strong>, or deploy to Vercel.
+                      </p>
+                    </div>
+                  )}
+                  
                   <p className="text-xs text-gray-400 mb-2">
                     Get your API key from{' '}
                     <a 
@@ -266,7 +277,7 @@ const SpotterTMLOptimizer = () => {
         {error && (
           <div className="bg-red-900/30 border-l-4 border-red-500 p-4 mb-6 rounded-lg shadow-md flex items-start gap-3">
             <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-red-300 font-medium">{error}</p>
+            <div className="text-red-300 font-medium whitespace-pre-line">{error}</div>
           </div>
         )}
 
