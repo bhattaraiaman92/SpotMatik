@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Zap } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Zap, FileDown } from 'lucide-react';
 import { AIServiceFactory } from './services/aiServiceFactory';
 import { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES } from './config/apiConfig';
+import { exportToDocx } from './utils/exportToDocx';
 
 const SpotterTMLOptimizer = () => {
   const [file, setFile] = useState(null);
@@ -72,6 +73,16 @@ const SpotterTMLOptimizer = () => {
     a.download = 'spotter-optimization-report.md';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportToWord = async () => {
+    if (!results) return;
+    try {
+      await exportToDocx(results, 'spotter-optimization-report.docx');
+    } catch (error) {
+      setError(`Error exporting to Word: ${error.message}`);
+      console.error('Export error:', error);
+    }
   };
 
   return (
@@ -321,13 +332,22 @@ const SpotterTMLOptimizer = () => {
             <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">📊 Model Overview</h2>
-                <button
-                  onClick={downloadReport}
-                  className="flex items-center gap-2 px-4 py-2 bg-ts-orange-500/20 text-ts-orange-400 rounded-lg hover:bg-ts-orange-500/30 transition-all font-semibold shadow-sm hover:shadow-md"
-                >
-                  <Download className="w-5 h-5" />
-                  Download Report
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={downloadReport}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-all font-semibold shadow-sm hover:shadow-md"
+                  >
+                    <Download className="w-5 h-5" />
+                    Markdown
+                  </button>
+                  <button
+                    onClick={exportToWord}
+                    className="flex items-center gap-2 px-4 py-2 bg-ts-orange-500 text-white rounded-lg hover:bg-ts-orange-600 transition-all font-semibold shadow-md shadow-ts-orange-500/20 hover:shadow-lg hover:shadow-ts-orange-500/30"
+                  >
+                    <FileDown className="w-5 h-5" />
+                    Export to Word
+                  </button>
+                </div>
               </div>
               
               {/* Primary Metrics */}
@@ -579,6 +599,79 @@ const SpotterTMLOptimizer = () => {
                 ))}
               </div>
             </div>
+
+            {/* Comparison Table */}
+            {results.comparisonTable && results.comparisonTable.length > 0 && (
+              <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
+                <h2 className="text-2xl font-bold text-white mb-6">📋 Current vs Recommended Comparison</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs uppercase bg-gray-800 text-gray-400">
+                      <tr>
+                        <th className="px-4 py-3">Priority</th>
+                        <th className="px-4 py-3">Current Name</th>
+                        <th className="px-4 py-3">Recommended Name</th>
+                        <th className="px-4 py-3">Current Description</th>
+                        <th className="px-4 py-3">Recommended Description</th>
+                        <th className="px-4 py-3">Current Synonyms</th>
+                        <th className="px-4 py-3">Recommended Synonyms</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.comparisonTable.map((row, idx) => (
+                        <tr key={idx} className={`border-b border-gray-700 ${
+                          row.priority === 'Critical' ? 'bg-red-900/10' :
+                          row.priority === 'Important' ? 'bg-yellow-900/10' :
+                          'bg-green-900/10'
+                        }`}>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              row.priority === 'Critical' ? 'bg-red-500/20 text-red-400' :
+                              row.priority === 'Important' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-green-500/20 text-green-400'
+                            }`}>
+                              {row.priority === 'Critical' ? '🔴' : row.priority === 'Important' ? '🟡' : '🟢'} {row.priority}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-gray-400">{row.currentName}</td>
+                          <td className="px-4 py-3 font-semibold text-ts-teal-400">{row.recommendedName}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs max-w-xs">
+                            {row.currentDescription === 'None' || !row.currentDescription ? (
+                              <span className="text-red-400 italic">Missing</span>
+                            ) : (
+                              row.currentDescription
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-300 text-xs max-w-xs">{row.recommendedDescription}</td>
+                          <td className="px-4 py-3 text-xs">
+                            {row.currentSynonyms === 'None' || !row.currentSynonyms || row.currentSynonyms.length === 0 ? (
+                              <span className="text-red-400 italic">None</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {(Array.isArray(row.currentSynonyms) ? row.currentSynonyms : []).map((syn, synIdx) => (
+                                  <span key={synIdx} className="px-2 py-0.5 bg-gray-700 text-gray-400 rounded text-xs">
+                                    {syn}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <div className="flex flex-wrap gap-1">
+                              {row.recommendedSynonyms.map((syn, synIdx) => (
+                                <span key={synIdx} className="px-2 py-0.5 bg-ts-orange-500/20 text-ts-orange-400 rounded text-xs">
+                                  {syn}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
