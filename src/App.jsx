@@ -374,22 +374,34 @@ const SpotterTMLOptimizer = () => {
 
               {/* Statistics */}
               {results.statistics && (
-                <div className="grid md:grid-cols-4 gap-4 mt-6">
+                <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
                   <div className="p-4 bg-red-900/20 rounded-lg border border-red-500/30">
                     <p className="text-sm text-red-400 mb-1 font-medium">Missing Descriptions</p>
-                    <p className="text-2xl font-bold text-red-400">{results.statistics.missingDescriptions}</p>
+                    <p className="text-2xl font-bold text-red-400">{results.statistics.missingDescriptions || 0}</p>
                   </div>
                   <div className="p-4 bg-yellow-900/20 rounded-lg border border-yellow-500/30">
                     <p className="text-sm text-yellow-400 mb-1 font-medium">Abbreviated Names</p>
-                    <p className="text-2xl font-bold text-yellow-400">{results.statistics.abbreviatedNames}</p>
+                    <p className="text-2xl font-bold text-yellow-400">{results.statistics.abbreviatedNames || 0}</p>
                   </div>
                   <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
                     <p className="text-sm text-blue-400 mb-1 font-medium">Needing Synonyms</p>
-                    <p className="text-2xl font-bold text-blue-400">{results.statistics.needingSynonyms}</p>
+                    <p className="text-2xl font-bold text-blue-400">{results.statistics.needingSynonyms || 0}</p>
                   </div>
+                  {results.statistics.descriptionsOver200Chars !== undefined && (
+                    <div className="p-4 bg-orange-900/20 rounded-lg border border-orange-500/30">
+                      <p className="text-sm text-orange-400 mb-1 font-medium">Over 200 Chars</p>
+                      <p className="text-2xl font-bold text-orange-400">{results.statistics.descriptionsOver200Chars || 0}</p>
+                    </div>
+                  )}
+                  {results.statistics.synonymOverlapIssues !== undefined && (
+                    <div className="p-4 bg-pink-900/20 rounded-lg border border-pink-500/30">
+                      <p className="text-sm text-pink-400 mb-1 font-medium">Synonym Overlaps</p>
+                      <p className="text-2xl font-bold text-pink-400">{results.statistics.synonymOverlapIssues || 0}</p>
+                    </div>
+                  )}
                   <div className="p-4 bg-purple-900/20 rounded-lg border border-purple-500/30">
                     <p className="text-sm text-purple-400 mb-1 font-medium">Impact Level</p>
-                    <p className="text-2xl font-bold text-purple-400">{results.statistics.impactLevel}</p>
+                    <p className="text-2xl font-bold text-purple-400">{results.statistics.impactLevel || 'N/A'}</p>
                   </div>
                 </div>
               )}
@@ -642,7 +654,14 @@ const SpotterTMLOptimizer = () => {
                               row.currentDescription
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-300 text-xs max-w-xs">{row.recommendedDescription}</td>
+                          <td className="px-4 py-3 text-gray-300 text-xs max-w-xs">
+                            {row.recommendedDescription}
+                            {row.descriptionCharCount && (
+                              <span className="block text-xs text-gray-500 mt-1">
+                                ({row.descriptionCharCount}/200 chars)
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-xs">
                             {row.currentSynonyms === 'None' || !row.currentSynonyms || row.currentSynonyms.length === 0 ? (
                               <span className="text-red-400 italic">None</span>
