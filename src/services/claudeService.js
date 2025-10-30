@@ -106,72 +106,99 @@ export class ClaudeService extends AIService {
   }
 
   async callWithProxy(tmlContent) {
-    // Determine proxy URL based on environment
-    // Check if we're running locally (development) or in production
-    const isLocalDev = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1'
-    );
+    // Try multiple proxy URLs in order of preference
+    // This ensures it works in both local dev and production
+    const proxyUrls = [];
     
-    const proxyUrl = isLocalDev
-      ? 'http://localhost:3000/api/claude-proxy'
-      : '/api/claude-proxy';
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      const protocol = window.location.protocol;
+      
+      // Add relative URL first (works in production/Vercel)
+      proxyUrls.push('/api/claude-proxy');
+      
+      // Add absolute URL based on current host (works in local dev with same origin)
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Try common dev server ports - prioritize 3001 (local proxy server)
+        const ports = ['3001', port || '3000', '5173', '8080'];
+        ports.forEach(p => {
+          proxyUrls.push(`${protocol}//${hostname}:${p}/api/claude-proxy`);
+        });
+      } else {
+        // For production, also try absolute URL
+        proxyUrls.push(`${protocol}//${hostname}${port ? ':' + port : ''}/api/claude-proxy`);
+      }
+    } else {
+      // Fallback if window is not available
+      proxyUrls.push('/api/claude-proxy');
+    }
 
-    try {
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey: this.apiKey,
-          model: this.config.model,
-          tmlContent: tmlContent,
-          systemPrompt: SYSTEM_PROMPT
-        })
-      });
+    let lastError = null;
+    
+    // Try each proxy URL
+    for (const proxyUrl of proxyUrls) {
+      try {
+        const response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            apiKey: this.apiKey,
+            model: this.config.model,
+            tmlContent: tmlContent,
+            systemPrompt: SYSTEM_PROMPT
+          })
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `Proxy request failed with status ${response.status}`;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || `Proxy request failed with status ${response.status}`;
+          
+          // If it's a 404, try next URL
+          if (response.status === 404) {
+            lastError = new Error(`Proxy endpoint not found at ${proxyUrl}`);
+            continue; // Try next URL
+          }
+          
+          // For other errors, throw immediately
+          throw new Error(`Proxy request failed: ${errorMessage}`);
+        }
+
+        const data = await response.json();
         
-        // Provide more specific error messages
-        if (response.status === 404) {
-          throw new Error(
-            `Proxy endpoint not found (404). ` +
-            `The proxy server may not be available. ` +
-            `If running locally, make sure the dev server is running with the proxy endpoint.`
-          );
+        if (!data.success || !data.content) {
+          throw new Error('Invalid response from proxy: missing content');
+        }
+
+        // Success! Return the response text
+        return data.content[0].text;
+        
+      } catch (error) {
+        // If it's a network error (proxy unavailable), try next URL
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          lastError = new Error(`Failed to connect to proxy server at ${proxyUrl}`);
+          continue; // Try next URL
         }
         
-        throw new Error(`Proxy request failed: ${errorMessage}`);
+        // For other errors, throw immediately (don't retry)
+        throw error;
       }
-
-      const data = await response.json();
-      
-      if (!data.success || !data.content) {
-        throw new Error('Invalid response from proxy: missing content');
-      }
-
-      // Return the response text
-      return data.content[0].text;
-      
-    } catch (error) {
-      // Wrap fetch errors with more context
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error(
-          `Failed to connect to proxy server at ${proxyUrl}. ` +
-          `This might mean:\n` +
-          `- The proxy endpoint is not available\n` +
-          `- If running locally, the dev server may not be running\n` +
-          `- Network connectivity issues\n\n` +
-          `Consider using OpenAI or Gemini provider instead, or deploy to Vercel.`
-        );
-      }
-      
-      // Re-throw other errors with context
-      throw error;
     }
+    
+    // If we've tried all URLs and none worked, throw the last error with helpful message
+    throw new Error(
+      `Claude proxy is unavailable. Tried ${proxyUrls.length} proxy URL(s) but none are accessible.\n\n` +
+      `This typically means:\n` +
+      `- You're running locally and the dev server doesn't support API routes\n` +
+      `- The proxy endpoint isn't deployed\n\n` +
+      `Quick solutions:\n` +
+      `1. Use OpenAI or Gemini provider instead (they work everywhere)\n` +
+      `2. Deploy this app to Vercel (proxy will work automatically)\n` +
+      `3. Run with a dev server that supports API routes (like Vite with a plugin)\n\n` +
+      `Last attempted URL: ${proxyUrls[proxyUrls.length - 1]}`
+    );
   }
 }
 
