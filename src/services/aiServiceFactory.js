@@ -31,7 +31,7 @@ export class AIServiceFactory {
         return new ClaudeService(apiKey, mode);
       
       case AI_PROVIDERS.OPENAI:
-        return new OpenAIService(apiKey, mode, azureEndpoint);
+        return new OpenAIService(apiKey, mode, azureConfig);
       
       case AI_PROVIDERS.GEMINI:
         return new GeminiService(apiKey, mode);

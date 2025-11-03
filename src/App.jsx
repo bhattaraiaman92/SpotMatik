@@ -170,7 +170,9 @@ const SpotterTMLOptimizer = () => {
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">Select Provider</label>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {Object.values(AI_PROVIDERS).map((provider) => (
+                    {Object.values(AI_PROVIDERS)
+                      .filter(provider => provider !== AI_PROVIDERS.AZURE_OPENAI) // Azure handled through OpenAI provider
+                      .map((provider) => (
                       <button
                         key={provider}
                         onClick={() => handleProviderChange(provider)}
@@ -455,14 +457,13 @@ const SpotterTMLOptimizer = () => {
                 <span className="text-gray-500 ml-2">
                   ({selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint 
                     ? (azureDeployments[selectedMode] || 'Not configured')
-                    : (selectedMode === MODEL_MODES.STANDARD 
+                    : selectedMode === MODEL_MODES.STANDARD 
                       ? PROVIDER_INFO[selectedProvider].standardModel 
                       : selectedMode === MODEL_MODES.ADVANCED
                       ? PROVIDER_INFO[selectedProvider].advancedModel
                       : selectedMode === MODEL_MODES.REASONING
                       ? 'o1-mini'
-                      : 'o3-mini')
-                  )}
+                      : 'o3-mini'})
                 </span>
               </p>
               {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && (
@@ -704,7 +705,7 @@ const SpotterTMLOptimizer = () => {
             </div>
 
             {/* CRITICAL Priority */}
-            {results.columnRecommendations.critical && results.columnRecommendations.critical.length > 0 && (
+            {results.columnRecommendations && results.columnRecommendations.critical && results.columnRecommendations.critical.length > 0 && (
               <div className="bg-gray-900 rounded-xl shadow-2xl border border-red-500/30 p-8">
                 <h2 className="text-2xl font-bold text-red-400 mb-6">🔴 CRITICAL - Do First</h2>
                 <div className="space-y-6">
@@ -753,7 +754,7 @@ const SpotterTMLOptimizer = () => {
             )}
 
             {/* IMPORTANT Priority */}
-            {results.columnRecommendations.important && results.columnRecommendations.important.length > 0 && (
+            {results.columnRecommendations && results.columnRecommendations.important && results.columnRecommendations.important.length > 0 && (
               <div className="bg-gray-900 rounded-xl shadow-2xl border border-yellow-500/30 p-8">
                 <h2 className="text-2xl font-bold text-yellow-400 mb-6">🟡 IMPORTANT - Do Soon</h2>
                 <div className="space-y-6">
@@ -802,7 +803,7 @@ const SpotterTMLOptimizer = () => {
             )}
 
             {/* NICE TO HAVE Priority */}
-            {results.columnRecommendations.niceToHave && results.columnRecommendations.niceToHave.length > 0 && (
+            {results.columnRecommendations && results.columnRecommendations.niceToHave && results.columnRecommendations.niceToHave.length > 0 && (
               <div className="bg-gray-900 rounded-xl shadow-2xl border border-green-500/30 p-8">
                 <h2 className="text-2xl font-bold text-green-400 mb-6">🟢 NICE TO HAVE - When Time Permits</h2>
                 <div className="space-y-6">
@@ -853,7 +854,7 @@ const SpotterTMLOptimizer = () => {
             <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
               <h2 className="text-2xl font-bold text-white mb-6">🚀 Quick Wins</h2>
               <div className="space-y-2">
-                {results.quickWins.map((win, idx) => (
+                {results.quickWins && results.quickWins.map((win, idx) => (
                   <div key={idx} className="flex items-start gap-3 p-4 bg-ts-teal-500/10 rounded-lg border-l-4 border-ts-teal-500 shadow-sm hover:shadow-md hover:bg-ts-teal-500/15 transition-all">
                     <span className="flex-shrink-0 w-6 h-6 bg-ts-orange-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                       {idx + 1}
