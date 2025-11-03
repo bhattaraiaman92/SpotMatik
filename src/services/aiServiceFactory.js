@@ -1,5 +1,6 @@
 import { ClaudeService } from './claudeService';
 import { OpenAIService } from './openaiService';
+import { AzureOpenAIService } from './azureOpenAIService';
 import { GeminiService } from './geminiService';
 import { AI_PROVIDERS } from '../config/apiConfig';
 
@@ -9,12 +10,13 @@ import { AI_PROVIDERS } from '../config/apiConfig';
 export class AIServiceFactory {
   /**
    * Create an AI service instance based on provider
-   * @param {string} provider - The AI provider ('claude', 'openai', or 'gemini')
+   * @param {string} provider - The AI provider ('claude', 'openai', 'azure-openai', or 'gemini')
    * @param {string} apiKey - The API key for the provider
-   * @param {string} mode - Model mode ('standard' or 'advanced')
+   * @param {string} mode - Model mode ('standard', 'advanced', 'reasoning', or 'advancedReasoning')
+   * @param {Object} options - Additional options (azureEndpoint, deploymentName for Azure OpenAI)
    * @returns {AIService} - Instance of the appropriate service
    */
-  static createService(provider, apiKey, mode = 'standard') {
+  static createService(provider, apiKey, mode = 'standard', options = {}) {
     if (!provider) {
       throw new Error('Provider is required');
     }
@@ -31,6 +33,14 @@ export class AIServiceFactory {
       
       case AI_PROVIDERS.OPENAI:
         return new OpenAIService(apiKey, mode);
+      
+      case AI_PROVIDERS.AZURE_OPENAI:
+        return new AzureOpenAIService(
+          apiKey, 
+          mode, 
+          options.azureEndpoint, 
+          options.deploymentName
+        );
       
       case AI_PROVIDERS.GEMINI:
         return new GeminiService(apiKey, mode);
