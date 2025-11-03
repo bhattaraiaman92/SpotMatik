@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { apiKey, model, tmlContent, systemPrompt } = req.body;
+    const { apiKey, model, tmlContent, businessQuestions, systemPrompt } = req.body;
 
     if (!apiKey || !model || !tmlContent || !systemPrompt) {
       return res.status(400).json({ 
@@ -29,6 +29,10 @@ export default async function handler(req, res) {
       apiKey: apiKey
     });
 
+    const businessQuestionsSection = businessQuestions 
+      ? `\n\n---\n\nBusiness Questions File:\n\n${businessQuestions}\n\n---\n\n`
+      : '';
+
     // Make the API call
     const message = await client.messages.create({
       model: model,
@@ -37,7 +41,7 @@ export default async function handler(req, res) {
       messages: [
         {
           role: 'user',
-          content: `${systemPrompt}\n\n---\n\nNow analyze this TML file:\n\n${tmlContent}\n\nReturn ONLY valid JSON, no other text.`
+          content: `${systemPrompt}\n\n---\n\nNow analyze this TML file:\n\n${tmlContent}${businessQuestionsSection}Return ONLY valid JSON, no other text.`
         }
       ]
     });

@@ -12,8 +12,12 @@ export class GeminiService extends AIService {
     this.client = new GoogleGenerativeAI(apiKey);
   }
 
-  async callProviderAPI(tmlContent) {
+  async callProviderAPI(tmlContent, businessQuestions = null) {
     try {
+      const businessQuestionsSection = businessQuestions 
+        ? `\n\n---\n\nBusiness Questions File:\n\n${businessQuestions}\n\n---\n\n`
+        : '';
+      
       const generativeModel = this.client.getGenerativeModel({ 
         model: this.config.model,
         generationConfig: {
@@ -24,7 +28,7 @@ export class GeminiService extends AIService {
         }
       });
 
-      const prompt = `${SYSTEM_PROMPT}\n\n---\n\nNow analyze this TML file:\n\n${tmlContent}\n\nReturn ONLY valid JSON, no other text.`;
+      const prompt = `${SYSTEM_PROMPT}\n\n---\n\nNow analyze this TML file:\n\n${tmlContent}${businessQuestionsSection}Return ONLY valid JSON, no other text.`;
       
       const result = await generativeModel.generateContent(prompt);
       const response = await result.response;

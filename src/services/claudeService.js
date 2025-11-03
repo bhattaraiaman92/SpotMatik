@@ -19,11 +19,11 @@ export class ClaudeService extends AIService {
     }
   }
 
-  async callProviderAPI(tmlContent) {
+  async callProviderAPI(tmlContent, businessQuestions = null) {
     // Try proxy first if enabled
     if (this.useProxy) {
       try {
-        return await this.callWithProxy(tmlContent);
+        return await this.callWithProxy(tmlContent, businessQuestions);
       } catch (proxyError) {
         console.warn('Proxy failed:', proxyError);
         
@@ -62,6 +62,10 @@ export class ClaudeService extends AIService {
     }
 
     try {
+      const businessQuestionsSection = businessQuestions 
+        ? `\n\n---\n\nBusiness Questions File:\n\n${businessQuestions}\n\n---\n\n`
+        : '';
+      
       const message = await this.client.messages.create({
         model: this.config.model,
         max_tokens: this.config.maxTokens,
@@ -69,7 +73,7 @@ export class ClaudeService extends AIService {
         messages: [
           {
             role: 'user',
-            content: `${SYSTEM_PROMPT}\n\n---\n\nNow analyze this TML file:\n\n${tmlContent}\n\nReturn ONLY valid JSON, no other text.`
+            content: `${SYSTEM_PROMPT}\n\n---\n\nNow analyze this TML file:\n\n${tmlContent}${businessQuestionsSection}Return ONLY valid JSON, no other text.`
           }
         ]
       });
@@ -105,7 +109,7 @@ export class ClaudeService extends AIService {
     }
   }
 
-  async callWithProxy(tmlContent) {
+  async callWithProxy(tmlContent, businessQuestions = null) {
     // Try multiple proxy URLs in order of preference
     // This ensures it works in both local dev and production
     const proxyUrls = [];
@@ -148,6 +152,7 @@ export class ClaudeService extends AIService {
             apiKey: this.apiKey,
             model: this.config.model,
             tmlContent: tmlContent,
+            businessQuestions: businessQuestions,
             systemPrompt: SYSTEM_PROMPT
           })
         });

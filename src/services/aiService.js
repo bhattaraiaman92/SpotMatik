@@ -17,14 +17,15 @@ export class AIService {
   /**
    * Analyze TML content using the AI provider with retry logic
    * @param {string} tmlContent - The TML file content to analyze
+   * @param {string|null} businessQuestions - Optional business questions file content
    * @returns {Promise<Object>} - Analysis results in standardized format
    */
-  async analyzeTML(tmlContent) {
+  async analyzeTML(tmlContent, businessQuestions = null) {
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         console.log(`[${this.constructor.name}] Attempt ${attempt}/${this.maxRetries} with mode: ${this.mode}`);
         
-        const response = await this.callProviderAPI(tmlContent);
+        const response = await this.callProviderAPI(tmlContent, businessQuestions);
         const json = this.parseResponse(response);
         
         if (json) {
@@ -49,9 +50,10 @@ export class AIService {
   /**
    * Provider-specific API call - must be implemented by subclasses
    * @param {string} tmlContent - The TML file content to analyze
+   * @param {string|null} businessQuestions - Optional business questions file content
    * @returns {Promise<string>} - Raw response text from provider
    */
-  async callProviderAPI(tmlContent) {
+  async callProviderAPI(tmlContent, businessQuestions = null) {
     throw new Error('callProviderAPI must be implemented by provider-specific service');
   }
 

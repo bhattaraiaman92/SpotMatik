@@ -5,20 +5,23 @@ import { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES } from './config/apiConfig';
 import { exportToDocx } from './utils/exportToDocx';
 
 const SpotterTMLOptimizer = () => {
-  const [file, setFile] = useState(null);
+  const [tmlFile, setTmlFile] = useState(null);
+  const [questionsFile, setQuestionsFile] = useState(null);
   const [tmlContent, setTmlContent] = useState('');
+  const [questionsContent, setQuestionsContent] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [azureEndpoint, setAzureEndpoint] = useState('');
   const [selectedProvider, setSelectedProvider] = useState(AI_PROVIDERS.OPENAI);
   const [selectedMode, setSelectedMode] = useState(MODEL_MODES.STANDARD);
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
 
-  const handleFileUpload = (e) => {
+  const handleTmlFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
-      setFile(uploadedFile);
+      setTmlFile(uploadedFile);
       setError('');
       setResults(null);
       
@@ -30,9 +33,25 @@ const SpotterTMLOptimizer = () => {
     }
   };
 
+  const handleQuestionsFileUpload = (e) => {
+    const uploadedFile = e.target.files[0];
+    if (uploadedFile) {
+      setQuestionsFile(uploadedFile);
+      setError('');
+      setResults(null);
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setQuestionsContent(event.target.result);
+      };
+      reader.readAsText(uploadedFile);
+    }
+  };
+
   const handleProviderChange = (provider) => {
     setSelectedProvider(provider);
     setApiKey(''); // Clear API key when changing providers
+    setAzureEndpoint(''); // Clear Azure endpoint when changing providers
     setShowApiKeyInput(true);
   };
 
@@ -52,8 +71,9 @@ const SpotterTMLOptimizer = () => {
     setError('');
 
     try {
-      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode);
-      const results = await aiService.analyzeTML(tmlContent);
+      const azureEndpointToUse = selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint ? azureEndpoint : null;
+      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode, azureEndpointToUse);
+      const results = await aiService.analyzeTML(tmlContent, questionsContent || null);
       setResults(results);
     } catch (err) {
       setError(`Error analyzing TML file: ${err.message}`);
@@ -101,7 +121,7 @@ const SpotterTMLOptimizer = () => {
             <h1 className="text-4xl font-bold text-white">SpotMatik | Semantic Model Optimizer</h1>
           </div>
           <p className="text-lg text-gray-300">
-            Upload your ThoughtSpot Semantic Model (TML) and get AI-powered optimization recommendations
+            Upload your ThoughtSpot Semantic Model (TML) file and optionally a business questions (TXT) file to get AI-powered optimization recommendations
           </p>
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className="text-sm text-gray-400 font-semibold">Built with 💛 by ThoughtSpot CS</span>
@@ -203,38 +223,70 @@ const SpotterTMLOptimizer = () => {
                     </div>
                   )}
                   
+                  {/* Azure OpenAI Info */}
+                  {selectedProvider === AI_PROVIDERS.OPENAI && (
+                    <div className="mb-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                      <p className="text-xs text-blue-300">
+                        💡 <strong>Azure OpenAI:</strong> If you're using Azure OpenAI, optionally provide your Azure endpoint URL below. 
+                        Leave blank for standard OpenAI.
+                      </p>
+                    </div>
+                  )}
+                  
                   <p className="text-xs text-gray-400 mb-2">
                     Get your API key from{' '}
                     <a 
                       href={PROVIDER_INFO[selectedProvider].consoleUrl}
-                      target="_blank" 
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-ts-orange-500 hover:text-ts-orange-400 font-medium hover:underline"
                     >
                       {PROVIDER_INFO[selectedProvider].consoleUrl}
                     </a>
                   </p>
-                  <div className="flex gap-3">
+                  
+                  {/* API Key Input */}
+                  <div className="mb-3">
                     <input
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder={`${PROVIDER_INFO[selectedProvider].apiKeyPrefix}...`}
-                      className="flex-1 px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500"
+                      className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500"
                     />
-                    <button
-                      onClick={() => {
-                        if (apiKey) {
-                          setShowApiKeyInput(false);
-                        } else {
-                          setError('Please enter an API key');
-                        }
-                      }}
-                      className="px-6 py-2 bg-ts-orange-500 text-white rounded-lg font-semibold hover:bg-ts-orange-600 shadow-md shadow-ts-orange-500/20 hover:shadow-lg hover:shadow-ts-orange-500/30 transition-all transform hover:scale-105"
-                    >
-                      Save Key
-                    </button>
                   </div>
+
+                  {/* Azure Endpoint Input (only for OpenAI) */}
+                  {selectedProvider === AI_PROVIDERS.OPENAI && (
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-400 mb-1">
+                        Azure OpenAI Endpoint (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={azureEndpoint}
+                        onChange={(e) => setAzureEndpoint(e.target.value)}
+                        placeholder="https://YOUR-RESOURCE-NAME.openai.azure.com"
+                        className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Format: https://YOUR-RESOURCE-NAME.openai.azure.com (or leave blank for standard OpenAI)
+                      </p>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      if (apiKey) {
+                        setShowApiKeyInput(false);
+                      } else {
+                        setError('Please enter an API key');
+                      }
+                    }}
+                    className="w-full px-6 py-2 bg-ts-orange-500 text-white rounded-lg font-semibold hover:bg-ts-orange-600 shadow-md shadow-ts-orange-500/20 hover:shadow-lg hover:shadow-ts-orange-500/30 transition-all transform hover:scale-105"
+                  >
+                    Save Key
+                  </button>
                 </div>
               </div>
             </div>
@@ -267,42 +319,80 @@ const SpotterTMLOptimizer = () => {
         )}
 
         <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8 mb-6">
-          <div className="flex flex-col items-center">
-            <label className="w-full max-w-2xl cursor-pointer">
-              <div className={`border-3 border-dashed rounded-xl p-12 text-center transition-all ${
-                file ? 'border-ts-teal-500 bg-ts-teal-500/10' : 'border-ts-orange-500 bg-ts-orange-500/5 hover:bg-ts-orange-500/10 hover:border-ts-orange-400'
-              }`}>
-                {file ? (
-                  <div className="flex items-center justify-center gap-3">
-                    <FileText className="w-12 h-12 text-ts-teal-500" />
-                    <div className="text-left">
-                      <p className="text-lg font-semibold text-white">{file.name}</p>
-                      <p className="text-sm text-gray-400">{(file.size / 1024).toFixed(2)} KB</p>
+          <div className="flex flex-col items-center gap-6">
+            {/* TML File Upload */}
+            <div className="w-full max-w-2xl">
+              <label className="block text-sm font-semibold text-gray-300 mb-2">TML File (Required)</label>
+              <label className="w-full cursor-pointer">
+                <div className={`border-3 border-dashed rounded-xl p-8 text-center transition-all ${
+                  tmlFile ? 'border-ts-teal-500 bg-ts-teal-500/10' : 'border-ts-orange-500 bg-ts-orange-500/5 hover:bg-ts-orange-500/10 hover:border-ts-orange-400'
+                }`}>
+                  {tmlFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <FileText className="w-10 h-10 text-ts-teal-500" />
+                      <div className="text-left">
+                        <p className="text-base font-semibold text-white">{tmlFile.name}</p>
+                        <p className="text-xs text-gray-400">{(tmlFile.size / 1024).toFixed(2)} KB</p>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="w-16 h-16 mx-auto mb-4 text-ts-orange-500" />
-                    <p className="text-xl font-semibold text-white mb-2">
-                      Drop your TML file here or click to browse
-                    </p>
-                    <p className="text-sm text-gray-400">Supports .tml files</p>
-                  </>
-                )}
-              </div>
-              <input
-                type="file"
-                accept=".tml,.yaml,.yml"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
+                  ) : (
+                    <>
+                      <Upload className="w-12 h-12 mx-auto mb-3 text-ts-orange-500" />
+                      <p className="text-lg font-semibold text-white mb-1">
+                        Drop TML file here or click to browse
+                      </p>
+                      <p className="text-xs text-gray-400">Supports .tml, .yaml, .yml files</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept=".tml,.yaml,.yml"
+                  onChange={handleTmlFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
 
-            {file && (
+            {/* Business Questions File Upload */}
+            <div className="w-full max-w-2xl">
+              <label className="block text-sm font-semibold text-gray-300 mb-2">Business Questions File (Optional)</label>
+              <label className="w-full cursor-pointer">
+                <div className={`border-3 border-dashed rounded-xl p-8 text-center transition-all ${
+                  questionsFile ? 'border-ts-teal-500 bg-ts-teal-500/10' : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800 hover:border-gray-500'
+                }`}>
+                  {questionsFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <FileText className="w-10 h-10 text-ts-teal-500" />
+                      <div className="text-left">
+                        <p className="text-base font-semibold text-white">{questionsFile.name}</p>
+                        <p className="text-xs text-gray-400">{(questionsFile.size / 1024).toFixed(2)} KB</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-12 h-12 mx-auto mb-3 text-gray-500" />
+                      <p className="text-lg font-semibold text-white mb-1">
+                        Drop business questions file here or click to browse
+                      </p>
+                      <p className="text-xs text-gray-400">Supports .txt files. List business questions users typically ask.</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept=".txt"
+                  onChange={handleQuestionsFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {tmlFile && (
               <button
                 onClick={analyzeTML}
                 disabled={analyzing}
-                className="mt-6 px-8 py-4 bg-ts-orange-500 text-white rounded-lg font-semibold text-lg hover:bg-ts-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed transition-all flex items-center gap-3 shadow-lg shadow-ts-orange-500/30 hover:shadow-xl hover:shadow-ts-orange-500/40 transform hover:scale-105"
+                className="mt-2 px-8 py-4 bg-ts-orange-500 text-white rounded-lg font-semibold text-lg hover:bg-ts-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed transition-all flex items-center gap-3 shadow-lg shadow-ts-orange-500/30 hover:shadow-xl hover:shadow-ts-orange-500/40 transform hover:scale-105"
               >
                 {analyzing ? (
                   <>
