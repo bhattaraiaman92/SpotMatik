@@ -461,7 +461,8 @@ const SpotterTMLOptimizer = () => {
                       ? PROVIDER_INFO[selectedProvider].advancedModel
                       : selectedMode === MODEL_MODES.REASONING
                       ? 'o1-mini'
-                      : 'o3-mini'))}
+                      : 'o3-mini')
+                  )}
                 </span>
               </p>
               {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && (
