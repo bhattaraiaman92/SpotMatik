@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Zap, FileDown } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Zap, FileDown, Brain } from 'lucide-react';
 import { AIServiceFactory } from './services/aiServiceFactory';
-import { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES } from './config/apiConfig';
+import { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES, supportsReasoningModels } from './config/apiConfig';
 import { exportToDocx } from './utils/exportToDocx';
 
 const SpotterTMLOptimizer = () => {
@@ -14,6 +14,10 @@ const SpotterTMLOptimizer = () => {
   const [selectedProvider, setSelectedProvider] = useState(AI_PROVIDERS.OPENAI);
   const [selectedMode, setSelectedMode] = useState(MODEL_MODES.STANDARD);
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
+  
+  // Azure OpenAI specific states
+  const [azureEndpoint, setAzureEndpoint] = useState('');
+  const [deploymentName, setDeploymentName] = useState('');
 
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
@@ -33,6 +37,9 @@ const SpotterTMLOptimizer = () => {
   const handleProviderChange = (provider) => {
     setSelectedProvider(provider);
     setApiKey(''); // Clear API key when changing providers
+    setAzureEndpoint(''); // Clear Azure endpoint
+    setDeploymentName(''); // Clear deployment name
+    setSelectedMode(MODEL_MODES.STANDARD); // Reset to standard mode
     setShowApiKeyInput(true);
   };
 
@@ -48,11 +55,29 @@ const SpotterTMLOptimizer = () => {
       return;
     }
 
+    // Validate Azure OpenAI specific fields
+    if (selectedProvider === AI_PROVIDERS.AZURE_OPENAI) {
+      if (!azureEndpoint) {
+        setError('Please enter your Azure OpenAI endpoint');
+        setShowApiKeyInput(true);
+        return;
+      }
+      if (!deploymentName) {
+        setError('Please enter your Azure OpenAI deployment name');
+        setShowApiKeyInput(true);
+        return;
+      }
+    }
+
     setAnalyzing(true);
     setError('');
 
     try {
-      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode);
+      const options = selectedProvider === AI_PROVIDERS.AZURE_OPENAI 
+        ? { azureEndpoint, deploymentName }
+        : {};
+      
+      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode, options);
       const results = await aiService.analyzeTML(tmlContent);
       setResults(results);
     } catch (err) {
@@ -145,7 +170,7 @@ const SpotterTMLOptimizer = () => {
                 {/* Model Mode Selection */}
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">Model Mode</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={`grid gap-3 ${supportsReasoningModels(selectedProvider) ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
                     <button
                       onClick={() => setSelectedMode(MODEL_MODES.STANDARD)}
                       className={`p-4 rounded-lg border-2 transition-all ${
@@ -184,6 +209,50 @@ const SpotterTMLOptimizer = () => {
                         {PROVIDER_INFO[selectedProvider].advancedModel}
                       </div>
                     </button>
+                    
+                    {/* Reasoning Models - Only for Azure OpenAI */}
+                    {supportsReasoningModels(selectedProvider) && (
+                      <>
+                        <button
+                          onClick={() => setSelectedMode(MODEL_MODES.REASONING)}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            selectedMode === MODEL_MODES.REASONING
+                              ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                              : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Brain className="w-5 h-5 text-blue-500" />
+                            <span className="font-semibold text-white">Reasoning</span>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Deep reasoning (o1)
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1 font-mono">
+                            {PROVIDER_INFO[selectedProvider].reasoningModel}
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setSelectedMode(MODEL_MODES.ADVANCED_REASONING)}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            selectedMode === MODEL_MODES.ADVANCED_REASONING
+                              ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                              : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Brain className="w-5 h-5 text-indigo-500" />
+                            <span className="font-semibold text-white">Advanced Reasoning</span>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Maximum reasoning (o3)
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1 font-mono">
+                            {PROVIDER_INFO[selectedProvider].advancedReasoningModel}
+                          </div>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -225,6 +294,13 @@ const SpotterTMLOptimizer = () => {
                     <button
                       onClick={() => {
                         if (apiKey) {
+                          // For Azure OpenAI, also validate endpoint and deployment
+                          if (selectedProvider === AI_PROVIDERS.AZURE_OPENAI) {
+                            if (!azureEndpoint || !deploymentName) {
+                              setError('Please enter Azure endpoint and deployment name');
+                              return;
+                            }
+                          }
                           setShowApiKeyInput(false);
                         } else {
                           setError('Please enter an API key');
@@ -236,6 +312,43 @@ const SpotterTMLOptimizer = () => {
                     </button>
                   </div>
                 </div>
+
+                {/* Azure OpenAI Specific Fields */}
+                {selectedProvider === AI_PROVIDERS.AZURE_OPENAI && (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Azure OpenAI Endpoint
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">
+                        Your Azure OpenAI resource endpoint (e.g., https://your-resource.openai.azure.com)
+                      </p>
+                      <input
+                        type="text"
+                        value={azureEndpoint}
+                        onChange={(e) => setAzureEndpoint(e.target.value)}
+                        placeholder="https://your-resource.openai.azure.com"
+                        className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500"
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Deployment Name
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">
+                        Your model deployment name from Azure OpenAI Studio
+                      </p>
+                      <input
+                        type="text"
+                        value={deploymentName}
+                        onChange={(e) => setDeploymentName(e.target.value)}
+                        placeholder="my-gpt4-deployment"
+                        className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -249,13 +362,26 @@ const SpotterTMLOptimizer = () => {
                 {PROVIDER_INFO[selectedProvider].name} configured
               </p>
               <p className="text-gray-400 text-sm">
-                Mode: {selectedMode === MODEL_MODES.STANDARD ? 'Standard' : 'Advanced'} 
+                Mode: {
+                  selectedMode === MODEL_MODES.STANDARD ? 'Standard' : 
+                  selectedMode === MODEL_MODES.ADVANCED ? 'Advanced' :
+                  selectedMode === MODEL_MODES.REASONING ? 'Reasoning' :
+                  'Advanced Reasoning'
+                }
                 <span className="text-gray-500 ml-2">
-                  ({selectedMode === MODEL_MODES.STANDARD 
-                    ? PROVIDER_INFO[selectedProvider].standardModel 
-                    : PROVIDER_INFO[selectedProvider].advancedModel})
+                  ({
+                    selectedMode === MODEL_MODES.STANDARD ? PROVIDER_INFO[selectedProvider].standardModel :
+                    selectedMode === MODEL_MODES.ADVANCED ? PROVIDER_INFO[selectedProvider].advancedModel :
+                    selectedMode === MODEL_MODES.REASONING ? PROVIDER_INFO[selectedProvider].reasoningModel :
+                    PROVIDER_INFO[selectedProvider].advancedReasoningModel
+                  })
                 </span>
               </p>
+              {selectedProvider === AI_PROVIDERS.AZURE_OPENAI && (
+                <p className="text-gray-400 text-xs mt-1">
+                  Endpoint: {azureEndpoint?.substring(0, 40)}... | Deployment: {deploymentName}
+                </p>
+              )}
             </div>
             <button
               onClick={() => setShowApiKeyInput(true)}
