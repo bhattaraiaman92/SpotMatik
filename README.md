@@ -30,13 +30,16 @@ npm run dev
 
 ## Features
 
-- **Multi-Provider AI Support**: Choose between Claude (Anthropic), ChatGPT (OpenAI), or Gemini (Google)
+- **Multi-Provider AI Support**: Choose between Claude (Anthropic), ChatGPT (OpenAI), Azure OpenAI, or Gemini (Google)
 - **Model Selection**: Select from multiple models within each provider
+  - Standard models for fast, cost-effective analysis
+  - Advanced models for deeper insights
+  - Reasoning models (Azure OpenAI only: o1-mini, o3-mini) for complex reasoning tasks
 - Upload TML files
 - AI-powered analysis
 - Industry-specific recommendations
 - Priority-based suggestions
-- Downloadable reports
+- Downloadable reports (Markdown and Word)
 
 ## Supported AI Providers
 
@@ -45,12 +48,19 @@ npm run dev
 - Get API key: [console.anthropic.com](https://console.anthropic.com/)
 
 ⚠️ **Important Note about Claude**: 
-If your organization has custom retention settings, Claude's API may block direct browser requests due to CORS restrictions. This app includes a backend proxy to work around this limitation. When deployed on Vercel, the proxy is automatically available. If you encounter CORS errors with Claude, please use **OpenAI** or **Gemini** instead, or ensure the app is deployed with the proxy enabled.
+If your organization has custom retention settings, Claude's API may block direct browser requests due to CORS restrictions. This app includes a backend proxy to work around this limitation. When deployed on Vercel, the proxy is automatically available. If you encounter CORS errors with Claude, please use **OpenAI**, **Azure OpenAI** or **Gemini** instead, or ensure the app is deployed with the proxy enabled.
 
 ### ChatGPT (OpenAI)
 - Models: `gpt-4o`, `gpt-4-turbo`, `gpt-4`, `gpt-3.5-turbo`
 - Get API key: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 - ✅ Fully supports browser-based requests
+
+### Azure OpenAI
+- Standard Models: `gpt-4o`, `gpt-4o-mini`
+- Reasoning Models: `o1-mini`, `o3-mini`
+- Get API key: [portal.azure.com](https://portal.azure.com/)
+- ✅ Enterprise-grade with reasoning models support
+- 📋 Requires: Azure endpoint URL and deployment name
 
 ### Gemini (Google)
 - Models: `gemini-2.0-flash-exp`, `gemini-1.5-pro`, `gemini-1.5-flash`
@@ -64,7 +74,7 @@ If your organization has custom retention settings, Claude's API may block direc
 - Tailwind CSS
 - Lucide React Icons
 - Anthropic SDK
-- OpenAI SDK
+- OpenAI SDK (supports both OpenAI and Azure OpenAI)
 - Google Generative AI SDK
 
 ## Development
@@ -88,6 +98,35 @@ The proxy solves CORS issues with Claude's API by making requests server-side.
 ### Other Platforms
 
 If deploying to other platforms, you may need to set up a similar backend proxy for Claude API support, or use OpenAI/Gemini which support direct browser requests.
+
+## Using Azure OpenAI
+
+Azure OpenAI requires three pieces of information:
+
+1. **API Key**: Found in Azure Portal under your OpenAI resource → Keys and Endpoint
+2. **Endpoint URL**: Your resource endpoint (e.g., `https://your-resource.openai.azure.com`)
+3. **Deployment Name**: The name you gave your model deployment in Azure OpenAI Studio
+
+### Setting up Azure OpenAI Deployments
+
+1. Go to [Azure OpenAI Studio](https://oai.azure.com/)
+2. Navigate to **Deployments**
+3. Create a deployment with one of these models:
+   - `gpt-4o` or `gpt-4o-mini` for standard/advanced modes
+   - `o1-mini` or `o3-mini` for reasoning modes
+4. Note the deployment name (you'll need this in the app)
+
+### Reasoning Models (o1, o3)
+
+Azure OpenAI's reasoning models are optimized for complex reasoning tasks:
+- **o1-mini**: Faster reasoning model, good for most tasks
+- **o3-mini**: Advanced reasoning with deeper analysis
+
+These models work differently than standard models:
+- They use more "thinking time" before responding
+- No temperature control (they self-regulate)
+- System messages are merged into user messages
+- Ideal for complex semantic modeling analysis
 
 ## Troubleshooting
 

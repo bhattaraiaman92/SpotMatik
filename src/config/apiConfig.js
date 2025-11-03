@@ -1,6 +1,7 @@
 // Supported AI Providers
 export const AI_PROVIDERS = {
   OPENAI: 'openai',
+  AZURE_OPENAI: 'azure-openai',
   CLAUDE: 'claude',
   GEMINI: 'gemini'
 };
@@ -8,7 +9,9 @@ export const AI_PROVIDERS = {
 // Model modes
 export const MODEL_MODES = {
   STANDARD: 'standard',
-  ADVANCED: 'advanced'
+  ADVANCED: 'advanced',
+  REASONING: 'reasoning',
+  ADVANCED_REASONING: 'advancedReasoning'
 };
 
 // Base configuration for each provider with toggleable models
@@ -25,6 +28,29 @@ export const AI_MODELS = {
       frequencyPenalty: 0.0,
       responseFormat: 'json',
       maxTokens: 12000
+    }
+  },
+  [AI_PROVIDERS.AZURE_OPENAI]: {
+    models: {
+      standard: 'gpt-4o-mini',           // fast, cheaper, 128K context
+      advanced: 'gpt-4o',                // more reasoning power, 128K context
+      reasoning: 'o1-mini',              // reasoning model (fast), 128K context
+      advancedReasoning: 'o3-mini'       // advanced reasoning model, 128K context
+    },
+    defaults: {
+      temperature: 0.25,
+      topP: 0.9,
+      presencePenalty: 0.0,
+      frequencyPenalty: 0.0,
+      responseFormat: 'json',
+      maxTokens: 16384,                  // Azure max output for GPT-4o/mini (16K tokens)
+      apiVersion: '2024-08-01-preview'  // Azure API version
+    },
+    reasoningDefaults: {
+      // Reasoning models (o1, o3) don't support temperature, top_p, system messages
+      // o1/o3 models support up to 100K output tokens, using 64K for safety
+      maxCompletionTokens: 64000,        // Large output for comprehensive analysis
+      apiVersion: '2024-12-01-preview'
     }
   },
   [AI_PROVIDERS.CLAUDE]: {
@@ -71,6 +97,18 @@ export const PROVIDER_INFO = {
     standardModel: AI_MODELS[AI_PROVIDERS.OPENAI].models.standard,
     advancedModel: AI_MODELS[AI_PROVIDERS.OPENAI].models.advanced
   },
+  [AI_PROVIDERS.AZURE_OPENAI]: {
+    name: 'Azure OpenAI',
+    apiKeyPrefix: '',
+    consoleUrl: 'https://portal.azure.com/',
+    description: 'Azure OpenAI - Enterprise-grade with reasoning models',
+    standardModel: AI_MODELS[AI_PROVIDERS.AZURE_OPENAI].models.standard,
+    advancedModel: AI_MODELS[AI_PROVIDERS.AZURE_OPENAI].models.advanced,
+    reasoningModel: AI_MODELS[AI_PROVIDERS.AZURE_OPENAI].models.reasoning,
+    advancedReasoningModel: AI_MODELS[AI_PROVIDERS.AZURE_OPENAI].models.advancedReasoning,
+    requiresEndpoint: true,
+    requiresDeployment: true
+  },
   [AI_PROVIDERS.GEMINI]: {
     name: 'Gemini (Google)',
     apiKeyPrefix: 'AI',
@@ -87,7 +125,23 @@ export function getModelConfig(provider, mode = MODEL_MODES.STANDARD) {
   if (!base) throw new Error(`Unsupported provider: ${provider}`);
 
   const model = base.models[mode] || base.models.standard;
+  
+  // For Azure OpenAI reasoning models, use special defaults
+  if (provider === AI_PROVIDERS.AZURE_OPENAI && isReasoningMode(mode)) {
+    return { ...base.reasoningDefaults, model };
+  }
+  
   return { ...base.defaults, model };
+}
+
+// Helper to check if a model mode is a reasoning model
+export function isReasoningMode(mode) {
+  return mode === MODEL_MODES.REASONING || mode === MODEL_MODES.ADVANCED_REASONING;
+}
+
+// Helper to check if a provider supports reasoning models
+export function supportsReasoningModels(provider) {
+  return provider === AI_PROVIDERS.AZURE_OPENAI;
 }
 
 // Simple JSON cleaner
