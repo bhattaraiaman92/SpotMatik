@@ -14,6 +14,12 @@ const SpotterTMLOptimizer = () => {
   const [error, setError] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [azureEndpoint, setAzureEndpoint] = useState('');
+  const [azureDeployments, setAzureDeployments] = useState({
+    standard: '',
+    advanced: '',
+    reasoning: '',
+    advancedReasoning: ''
+  });
   const [selectedProvider, setSelectedProvider] = useState(AI_PROVIDERS.OPENAI);
   const [selectedMode, setSelectedMode] = useState(MODEL_MODES.STANDARD);
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
@@ -52,7 +58,20 @@ const SpotterTMLOptimizer = () => {
     setSelectedProvider(provider);
     setApiKey(''); // Clear API key when changing providers
     setAzureEndpoint(''); // Clear Azure endpoint when changing providers
+    setAzureDeployments({ // Clear Azure deployment names when changing providers
+      standard: '',
+      advanced: '',
+      reasoning: '',
+      advancedReasoning: ''
+    });
     setShowApiKeyInput(true);
+  };
+
+  const handleAzureDeploymentChange = (mode, value) => {
+    setAzureDeployments(prev => ({
+      ...prev,
+      [mode]: value
+    }));
   };
 
   const analyzeTML = async () => {
@@ -71,8 +90,14 @@ const SpotterTMLOptimizer = () => {
     setError('');
 
     try {
-      const azureEndpointToUse = selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint ? azureEndpoint : null;
-      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode, azureEndpointToUse);
+      let azureConfig = null;
+      if (selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint) {
+        azureConfig = {
+          endpoint: azureEndpoint,
+          deployments: azureDeployments
+        };
+      }
+      const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode, azureConfig);
       const results = await aiService.analyzeTML(tmlContent, questionsContent || null);
       setResults(results);
     } catch (err) {
@@ -165,7 +190,11 @@ const SpotterTMLOptimizer = () => {
                 {/* Model Mode Selection */}
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">Model Mode</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={`grid gap-3 ${
+                    selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint 
+                      ? 'grid-cols-2 md:grid-cols-4' 
+                      : 'grid-cols-2'
+                  }`}>
                     <button
                       onClick={() => setSelectedMode(MODEL_MODES.STANDARD)}
                       className={`p-4 rounded-lg border-2 transition-all ${
@@ -182,7 +211,9 @@ const SpotterTMLOptimizer = () => {
                         Fast & cost-effective
                       </div>
                       <div className="text-xs text-gray-500 mt-1 font-mono">
-                        {PROVIDER_INFO[selectedProvider].standardModel}
+                        {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && azureDeployments.standard
+                          ? azureDeployments.standard
+                          : PROVIDER_INFO[selectedProvider].standardModel}
                       </div>
                     </button>
                     <button
@@ -201,9 +232,53 @@ const SpotterTMLOptimizer = () => {
                         More reasoning power
                       </div>
                       <div className="text-xs text-gray-500 mt-1 font-mono">
-                        {PROVIDER_INFO[selectedProvider].advancedModel}
+                        {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && azureDeployments.advanced
+                          ? azureDeployments.advanced
+                          : PROVIDER_INFO[selectedProvider].advancedModel}
                       </div>
                     </button>
+                    {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && (
+                      <>
+                        <button
+                          onClick={() => setSelectedMode(MODEL_MODES.REASONING)}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            selectedMode === MODEL_MODES.REASONING
+                              ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                              : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Sparkles className="w-5 h-5 text-blue-500" />
+                            <span className="font-semibold text-white">Reasoning</span>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            O1 reasoning model
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1 font-mono">
+                            {azureDeployments.reasoning || 'Not configured'}
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setSelectedMode(MODEL_MODES.ADVANCED_REASONING)}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            selectedMode === MODEL_MODES.ADVANCED_REASONING
+                              ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                              : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Sparkles className="w-5 h-5 text-indigo-500" />
+                            <span className="font-semibold text-white">Advanced Reasoning</span>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            O3 reasoning model
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1 font-mono">
+                            {azureDeployments.advancedReasoning || 'Not configured'}
+                          </div>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -227,8 +302,7 @@ const SpotterTMLOptimizer = () => {
                   {selectedProvider === AI_PROVIDERS.OPENAI && (
                     <div className="mb-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                       <p className="text-xs text-blue-300">
-                        💡 <strong>Azure OpenAI:</strong> If you're using Azure OpenAI, optionally provide your Azure endpoint URL below. 
-                        Leave blank for standard OpenAI.
+                        💡 <strong>Azure OpenAI:</strong> Configure Azure OpenAI settings below, or leave blank for standard OpenAI.
                       </p>
                     </div>
                   )}
@@ -247,6 +321,7 @@ const SpotterTMLOptimizer = () => {
                   
                   {/* API Key Input */}
                   <div className="mb-3">
+                    <label className="block text-xs text-gray-400 mb-1 font-semibold">API Key</label>
                     <input
                       type="password"
                       value={apiKey}
@@ -256,21 +331,94 @@ const SpotterTMLOptimizer = () => {
                     />
                   </div>
 
-                  {/* Azure Endpoint Input (only for OpenAI) */}
+                  {/* Azure Configuration Section (only for OpenAI) */}
                   {selectedProvider === AI_PROVIDERS.OPENAI && (
-                    <div className="mb-3">
-                      <label className="block text-xs text-gray-400 mb-1">
-                        Azure OpenAI Endpoint (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={azureEndpoint}
-                        onChange={(e) => setAzureEndpoint(e.target.value)}
-                        placeholder="https://YOUR-RESOURCE-NAME.openai.azure.com"
-                        className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Format: https://YOUR-RESOURCE-NAME.openai.azure.com (or leave blank for standard OpenAI)
+                    <div className="mb-3 p-4 bg-gray-800 rounded-lg border border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-300 mb-3">Azure OpenAI Configuration (Optional)</h3>
+                      
+                      {/* Azure Endpoint */}
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Endpoint URL
+                        </label>
+                        <input
+                          type="text"
+                          value={azureEndpoint}
+                          onChange={(e) => setAzureEndpoint(e.target.value)}
+                          placeholder="https://YOUR-RESOURCE-NAME.openai.azure.com"
+                          className="w-full px-4 py-2 bg-gray-900 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Your Azure OpenAI resource endpoint URL
+                        </p>
+                      </div>
+
+                      {/* Azure Deployment Names - Multiple Model Options */}
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-400 mb-2 font-semibold">
+                          Model Deployment Names
+                        </label>
+                        <div className="space-y-2">
+                          {/* Standard Model */}
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              Standard Model (e.g., gpt-4o-mini)
+                            </label>
+                            <input
+                              type="text"
+                              value={azureDeployments.standard}
+                              onChange={(e) => handleAzureDeploymentChange('standard', e.target.value)}
+                              placeholder="gpt-4o-mini-deployment"
+                              className="w-full px-4 py-2 bg-gray-900 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
+                            />
+                          </div>
+
+                          {/* Advanced Model */}
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              Advanced Model (e.g., gpt-4o)
+                            </label>
+                            <input
+                              type="text"
+                              value={azureDeployments.advanced}
+                              onChange={(e) => handleAzureDeploymentChange('advanced', e.target.value)}
+                              placeholder="gpt-4o-deployment"
+                              className="w-full px-4 py-2 bg-gray-900 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
+                            />
+                          </div>
+
+                          {/* Reasoning Model */}
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              Reasoning Model (e.g., o1-mini)
+                            </label>
+                            <input
+                              type="text"
+                              value={azureDeployments.reasoning}
+                              onChange={(e) => handleAzureDeploymentChange('reasoning', e.target.value)}
+                              placeholder="o1-mini-deployment"
+                              className="w-full px-4 py-2 bg-gray-900 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
+                            />
+                          </div>
+
+                          {/* Advanced Reasoning Model */}
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              Advanced Reasoning Model (e.g., o3-mini)
+                            </label>
+                            <input
+                              type="text"
+                              value={azureDeployments.advancedReasoning}
+                              onChange={(e) => handleAzureDeploymentChange('advancedReasoning', e.target.value)}
+                              placeholder="o3-mini-deployment"
+                              className="w-full px-4 py-2 bg-gray-900 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Configure deployment names for different model types. Leave blank if you don't have that deployment. 
+                        Select the mode above to use the corresponding deployment.
                       </p>
                     </div>
                   )}
@@ -301,13 +449,26 @@ const SpotterTMLOptimizer = () => {
                 {PROVIDER_INFO[selectedProvider].name} configured
               </p>
               <p className="text-gray-400 text-sm">
-                Mode: {selectedMode === MODEL_MODES.STANDARD ? 'Standard' : 'Advanced'} 
+                Mode: {selectedMode === MODEL_MODES.STANDARD ? 'Standard' : 
+                       selectedMode === MODEL_MODES.ADVANCED ? 'Advanced' :
+                       selectedMode === MODEL_MODES.REASONING ? 'Reasoning' : 'Advanced Reasoning'} 
                 <span className="text-gray-500 ml-2">
-                  ({selectedMode === MODEL_MODES.STANDARD 
-                    ? PROVIDER_INFO[selectedProvider].standardModel 
-                    : PROVIDER_INFO[selectedProvider].advancedModel})
+                  ({selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint 
+                    ? (azureDeployments[selectedMode] || 'Not configured')
+                    : (selectedMode === MODEL_MODES.STANDARD 
+                      ? PROVIDER_INFO[selectedProvider].standardModel 
+                      : selectedMode === MODEL_MODES.ADVANCED
+                      ? PROVIDER_INFO[selectedProvider].advancedModel
+                      : selectedMode === MODEL_MODES.REASONING
+                      ? 'o1-mini'
+                      : 'o3-mini'))}
                 </span>
               </p>
+              {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && (
+                <p className="text-gray-500 text-xs mt-1">
+                  Azure OpenAI: {azureEndpoint}
+                </p>
+              )}
             </div>
             <button
               onClick={() => setShowApiKeyInput(true)}

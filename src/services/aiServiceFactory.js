@@ -12,10 +12,10 @@ export class AIServiceFactory {
    * @param {string} provider - The AI provider ('claude', 'openai', or 'gemini')
    * @param {string} apiKey - The API key for the provider
    * @param {string} mode - Model mode ('standard' or 'advanced')
-   * @param {string|null} azureEndpoint - Optional Azure OpenAI endpoint URL
+   * @param {Object|null} azureConfig - Optional Azure OpenAI configuration object with {endpoint, deploymentStandard, deploymentAdvanced}
    * @returns {AIService} - Instance of the appropriate service
    */
-  static createService(provider, apiKey, mode = 'standard', azureEndpoint = null) {
+  static createService(provider, apiKey, mode = 'standard', azureConfig = null) {
     if (!provider) {
       throw new Error('Provider is required');
     }

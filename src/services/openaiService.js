@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
 import { AIService } from './aiService';
-import { SYSTEM_PROMPT, AI_PROVIDERS, getModelConfig } from '../config/apiConfig';
+import { SYSTEM_PROMPT, AI_PROVIDERS, getModelConfig, MODEL_MODES } from '../config/apiConfig';
 
 export class OpenAIService extends AIService {
-  constructor(apiKey, mode = 'standard', azureEndpoint = null) {
+  constructor(apiKey, mode = 'standard', azureConfig = null) {
     super(apiKey, mode);
     
     // Get model configuration for the selected mode
@@ -15,16 +15,27 @@ export class OpenAIService extends AIService {
       dangerouslyAllowBrowser: true // Only for client-side usage
     };
     
-    // If Azure endpoint is provided, use it for Azure OpenAI
-    if (azureEndpoint) {
+    // Store Azure configuration
+    this.azureConfig = azureConfig;
+    
+    // If Azure config is provided, use it for Azure OpenAI
+    if (azureConfig && azureConfig.endpoint) {
       // Ensure endpoint ends with /openai/v1/
-      const baseURL = azureEndpoint.endsWith('/openai/v1/') 
-        ? azureEndpoint 
-        : azureEndpoint.endsWith('/') 
-          ? `${azureEndpoint}openai/v1/`
-          : `${azureEndpoint}/openai/v1/`;
+      const baseURL = azureConfig.endpoint.endsWith('/openai/v1/') 
+        ? azureConfig.endpoint 
+        : azureConfig.endpoint.endsWith('/') 
+          ? `${azureConfig.endpoint}openai/v1/`
+          : `${azureConfig.endpoint}/openai/v1/`;
       
       clientConfig.baseURL = baseURL;
+      
+      // Override model with deployment name if provided
+      const deployments = azureConfig.deployments || {};
+      const deploymentName = deployments[mode];
+      
+      if (deploymentName) {
+        this.config.model = deploymentName;
+      }
     }
     
     this.client = new OpenAI(clientConfig);
