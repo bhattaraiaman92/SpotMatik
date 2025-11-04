@@ -305,6 +305,8 @@ STEP 5: Comprehensive Output
 
 CRITICAL: You MUST return ONLY valid JSON. Do not include markdown formatting, code blocks with json markers, explanatory text, or any other content outside the JSON. Return pure JSON that can be parsed directly.
 
+MANDATORY: The comparisonTable MUST contain EVERY SINGLE column from the TML file. This is NOT optional. Count all columns in the TML and ensure every one appears in comparisonTable.
+
 The JSON structure must follow this exact format:
 
 {
@@ -325,9 +327,42 @@ The JSON structure must follow this exact format:
     "string - instruction 5"
   ],
   "columnRecommendations": {
-    "critical": [...],
-    "important": [...],
-    "niceToHave": [...]
+    "critical": [
+      {
+        "columnName": "string - exact column name from TML",
+        "issue": "string - specific problem or gap identified",
+        "recommendations": {
+          "name": "string - improved column name (if needed, otherwise same as columnName)",
+          "description": "string - comprehensive description (up to 400 chars, always provide)",
+          "synonyms": ["string", "string", "string", "string", "string"],
+          "rationale": "string - why this recommendation matters for Spotter accuracy"
+        }
+      }
+    ],
+    "important": [
+      {
+        "columnName": "string - exact column name from TML",
+        "issue": "string - specific problem or gap identified",
+        "recommendations": {
+          "name": "string - improved column name (if needed, otherwise same as columnName)",
+          "description": "string - comprehensive description (up to 400 chars, always provide)",
+          "synonyms": ["string", "string", "string", "string", "string"],
+          "rationale": "string - why this recommendation matters for Spotter accuracy"
+        }
+      }
+    ],
+    "niceToHave": [
+      {
+        "columnName": "string - exact column name from TML",
+        "issue": "string - specific problem or gap identified",
+        "recommendations": {
+          "name": "string - improved column name (if needed, otherwise same as columnName)",
+          "description": "string - comprehensive description (up to 400 chars, always provide)",
+          "synonyms": ["string", "string", "string", "string", "string"],
+          "rationale": "string - why this recommendation matters for Spotter accuracy"
+        }
+      }
+    ]
   },
   "comparisonTable": [
     {
@@ -362,7 +397,36 @@ The JSON structure must follow this exact format:
 
 ADDITIONAL REQUIREMENTS
 
-Include every column from the TML in the comparisonTable, marking unmodified columns as "priority": "No Change Needed".
+CRITICAL REQUIREMENTS FOR comparisonTable:
+
+1. You MUST include EVERY SINGLE column from the TML file in the comparisonTable array. No exceptions.
+
+2. For columns that need changes:
+   - Set appropriate priority: "Critical", "Important", or "Nice to Have"
+   - Provide complete recommendedName, recommendedDescription, and recommendedSynonyms
+
+3. For columns that are already optimized (no changes needed):
+   - Set priority to "No Change Needed"
+   - Set recommendedName to the same as currentName
+   - STILL provide recommendedDescription (even if current description exists, optimize it for Spotter)
+   - STILL provide recommendedSynonyms (at least 3-5 synonyms, even if current synonyms exist)
+   - This ensures ALL columns have Spotter-optimized descriptions and synonyms
+
+4. Every row in comparisonTable MUST have:
+   - currentName (exact column name from TML)
+   - recommendedName (improved name or same as currentName)
+   - currentDescription (existing description or 'None')
+   - recommendedDescription (ALWAYS provide, even if no change needed - optimize for Spotter)
+   - currentSynonyms (existing synonyms array or 'None')
+   - recommendedSynonyms (ALWAYS provide array with 3-5 synonyms, even if no change needed)
+   - priority (Critical|Important|Nice to Have|No Change Needed)
+   - descriptionCharCount (number of characters in recommendedDescription, max 400)
+
+CRITICAL: For EVERY item in columnRecommendations (critical, important, niceToHave), you MUST ALWAYS provide a complete "recommendations" object with ALL fields:
+- name: Always provide (use columnName if no change needed)
+- description: ALWAYS provide (never omit, even if current description exists)
+- synonyms: ALWAYS provide an array with 3-5 synonyms (never empty)
+- rationale: ALWAYS provide explanation (never omit)
 
 Descriptions can be up to 400 characters, following Spotter interpretive best practices.
 
@@ -370,7 +434,7 @@ If a business questions file was provided, incorporate its context when writing 
 
 Avoid synonym overlap or ambiguity across the model.
 
-Provide complete, actionable recommendations — not generic placeholders.
+Provide complete, actionable recommendations — not generic placeholders. Never leave recommendation fields empty or null.
 
 Use natural, business-friendly phrasing aligned with how users speak and query.
 

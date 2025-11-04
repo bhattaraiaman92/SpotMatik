@@ -1,15 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Download, Sparkles, Key, Zap, FileDown } from 'lucide-react';
 import { AIServiceFactory } from './services/aiServiceFactory';
 import { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES } from './config/apiConfig';
 import { exportToDocx } from './utils/exportToDocx';
+import { parseTML } from './utils/tmlParser';
 
 const SpotterTMLOptimizer = () => {
   const [tmlFile, setTmlFile] = useState(null);
   const [questionsFile, setQuestionsFile] = useState(null);
   const [tmlContent, setTmlContent] = useState('');
   const [questionsContent, setQuestionsContent] = useState('');
+  const [tmlParsedData, setTmlParsedData] = useState(null); // Store parsed TML data
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingMessage, setAnalyzingMessage] = useState('');
+
+  // Progress messages for analysis
+  const progressMessages = [
+    'Analyzing your TML file structure...',
+    'Identifying columns and their relationships...',
+    'Evaluating column names and descriptions...',
+    'Generating Spotter-optimized recommendations...',
+    'Analyzing synonyms and query patterns...',
+    'Creating comprehensive optimization suggestions...',
+    'Finalizing recommendations...',
+    'Almost done! Preparing your report...'
+  ];
+
+  // Cycle through progress messages during analysis
+  useEffect(() => {
+    if (!analyzing) {
+      setAnalyzingMessage('');
+      return;
+    }
+
+    // Set initial message
+    setAnalyzingMessage(progressMessages[0]);
+    
+    const messageIndexRef = { current: 0 };
+    const interval = setInterval(() => {
+      messageIndexRef.current = (messageIndexRef.current + 1) % progressMessages.length;
+      setAnalyzingMessage(progressMessages[messageIndexRef.current]);
+    }, 4000); // Change message every 4 seconds
+
+    return () => {
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyzing]);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -24,6 +61,19 @@ const SpotterTMLOptimizer = () => {
   const [selectedMode, setSelectedMode] = useState(MODEL_MODES.STANDARD);
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
 
+  // Defensive check for required imports (after hooks)
+  if (!AI_PROVIDERS || !PROVIDER_INFO || !MODEL_MODES) {
+    console.error('Missing required imports:', { AI_PROVIDERS, PROVIDER_INFO, MODEL_MODES });
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-6">
+        <div className="bg-gray-900 rounded-xl shadow-2xl border border-red-500 p-8 max-w-2xl">
+          <h2 className="text-2xl font-bold text-red-500 mb-4">Configuration Error</h2>
+          <p className="text-white">Required configuration is missing. Please check the console for details.</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleTmlFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
@@ -33,7 +83,19 @@ const SpotterTMLOptimizer = () => {
       
       const reader = new FileReader();
       reader.onload = (event) => {
-        setTmlContent(event.target.result);
+        const content = event.target.result;
+        setTmlContent(content);
+        
+        // Parse TML to extract column and formula names
+        const parsed = parseTML(content);
+        setTmlParsedData(parsed);
+        
+        console.log('TML Parsed:', {
+          columns: parsed.columns,
+          formulas: parsed.formulas,
+          totalColumns: parsed.totalColumns,
+          totalFormulas: parsed.totalFormulas
+        });
       };
       reader.readAsText(uploadedFile);
     }
@@ -81,7 +143,7 @@ const SpotterTMLOptimizer = () => {
     }
 
     if (!apiKey) {
-      setError(`Please enter your ${PROVIDER_INFO[selectedProvider].name} API key`);
+      setError(`Please enter your ${PROVIDER_INFO[selectedProvider]?.name || selectedProvider} API key`);
       setShowApiKeyInput(true);
       return;
     }
@@ -98,7 +160,7 @@ const SpotterTMLOptimizer = () => {
         };
       }
       const aiService = AIServiceFactory.createService(selectedProvider, apiKey, selectedMode, azureConfig);
-      const results = await aiService.analyzeTML(tmlContent, questionsContent || null);
+      const results = await aiService.analyzeTML(tmlContent, questionsContent || null, tmlParsedData);
       setResults(results);
     } catch (err) {
       setError(`Error analyzing TML file: ${err.message}`);
@@ -127,6 +189,79 @@ const SpotterTMLOptimizer = () => {
     } catch (error) {
       setError(`Error exporting to Word: ${error.message}`);
       console.error('Export error:', error);
+    }
+  };
+
+  const exportComparisonTableToCSV = () => {
+    if (!results || !results.comparisonTable || results.comparisonTable.length === 0) {
+      setError('No comparison table data available to export');
+      return;
+    }
+
+    try {
+      // CSV header
+      const headers = [
+        'Priority',
+        'Current Name',
+        'Recommended Name',
+        'Current Description',
+        'Recommended Description',
+        'Current Synonyms',
+        'Recommended Synonyms',
+        'Description Char Count'
+      ];
+
+      // Escape CSV values (handle quotes, commas, newlines)
+      const escapeCSV = (value) => {
+        if (value === null || value === undefined) return '';
+        const stringValue = String(value);
+        // If contains comma, quote, or newline, wrap in quotes and escape quotes
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      };
+
+      // Convert synonyms array to string
+      const formatSynonyms = (synonyms) => {
+        if (!synonyms || synonyms === 'None') return '';
+        if (Array.isArray(synonyms)) {
+          return synonyms.join('; ');
+        }
+        return String(synonyms);
+      };
+
+      // Build CSV rows
+      const csvRows = [
+        headers.join(','),
+        ...results.comparisonTable.map(row => [
+          escapeCSV(row.priority || 'No Change Needed'),
+          escapeCSV(row.currentName || ''),
+          escapeCSV(row.recommendedName || ''),
+          escapeCSV(row.currentDescription === 'None' || !row.currentDescription ? '' : row.currentDescription),
+          escapeCSV(row.recommendedDescription || ''),
+          escapeCSV(formatSynonyms(row.currentSynonyms)),
+          escapeCSV(formatSynonyms(row.recommendedSynonyms)),
+          escapeCSV(row.descriptionCharCount || '')
+        ].join(','))
+      ];
+
+      // Create CSV content
+      const csvContent = csvRows.join('\n');
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spotter-comparison-table-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setError(`Error exporting CSV: ${error.message}`);
+      console.error('CSV export error:', error);
     }
   };
 
@@ -170,22 +305,24 @@ const SpotterTMLOptimizer = () => {
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">Select Provider</label>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {Object.values(AI_PROVIDERS)
-                      .filter(provider => provider !== AI_PROVIDERS.AZURE_OPENAI) // Azure handled through OpenAI provider
-                      .map((provider) => (
-                      <button
-                        key={provider}
-                        onClick={() => handleProviderChange(provider)}
-                        className={`p-4 rounded-lg border-2 transition-all text-left ${
-                          selectedProvider === provider
-                            ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
-                            : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
-                        }`}
-                      >
-                        <div className="font-semibold text-white">{PROVIDER_INFO[provider].name}</div>
-                        <div className="text-xs text-gray-400 mt-1">{PROVIDER_INFO[provider].description}</div>
-                      </button>
-                    ))}
+                    {(() => {
+                      const providers = Object.values(AI_PROVIDERS || {})
+                        .filter(provider => provider !== AI_PROVIDERS?.AZURE_OPENAI && PROVIDER_INFO?.[provider]);
+                      return providers.map((provider) => (
+                        <button
+                          key={provider}
+                          onClick={() => handleProviderChange(provider)}
+                          className={`p-4 rounded-lg border-2 transition-all text-left ${
+                            selectedProvider === provider
+                              ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                              : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="font-semibold text-white">{PROVIDER_INFO?.[provider]?.name || provider}</div>
+                          <div className="text-xs text-gray-400 mt-1">{PROVIDER_INFO?.[provider]?.description || ''}</div>
+                        </button>
+                      ));
+                    })()}
                   </div>
                 </div>
 
@@ -215,7 +352,7 @@ const SpotterTMLOptimizer = () => {
                       <div className="text-xs text-gray-500 mt-1 font-mono">
                         {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && azureDeployments.standard
                           ? azureDeployments.standard
-                          : PROVIDER_INFO[selectedProvider].standardModel}
+                          : PROVIDER_INFO[selectedProvider]?.standardModel || 'Standard'}
                       </div>
                     </button>
                     <button
@@ -236,7 +373,7 @@ const SpotterTMLOptimizer = () => {
                       <div className="text-xs text-gray-500 mt-1 font-mono">
                         {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && azureDeployments.advanced
                           ? azureDeployments.advanced
-                          : PROVIDER_INFO[selectedProvider].advancedModel}
+                          : PROVIDER_INFO[selectedProvider]?.advancedModel || 'Advanced'}
                       </div>
                     </button>
                     {selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint && (
@@ -287,7 +424,7 @@ const SpotterTMLOptimizer = () => {
                 {/* API Key Input */}
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    API Key for {PROVIDER_INFO[selectedProvider].name}
+                    API Key for {PROVIDER_INFO[selectedProvider]?.name || selectedProvider}
                   </label>
                   
                   {/* Claude CORS Warning */}
@@ -312,12 +449,12 @@ const SpotterTMLOptimizer = () => {
                   <p className="text-xs text-gray-400 mb-2">
                     Get your API key from{' '}
                     <a 
-                      href={PROVIDER_INFO[selectedProvider].consoleUrl}
+                      href={PROVIDER_INFO[selectedProvider]?.consoleUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-ts-orange-500 hover:text-ts-orange-400 font-medium hover:underline"
                     >
-                      {PROVIDER_INFO[selectedProvider].consoleUrl}
+                      {PROVIDER_INFO[selectedProvider]?.consoleUrl || 'Provider console'}
                     </a>
                   </p>
                   
@@ -328,7 +465,7 @@ const SpotterTMLOptimizer = () => {
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={`${PROVIDER_INFO[selectedProvider].apiKeyPrefix}...`}
+                      placeholder={`${PROVIDER_INFO[selectedProvider]?.apiKeyPrefix || ''}...`}
                       className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500"
                     />
                   </div>
@@ -448,7 +585,7 @@ const SpotterTMLOptimizer = () => {
             <CheckCircle className="w-6 h-6 text-ts-teal-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-white font-semibold">
-                {PROVIDER_INFO[selectedProvider].name} configured
+                {PROVIDER_INFO[selectedProvider]?.name || selectedProvider} configured
               </p>
               <p className="text-gray-400 text-sm">
                 Mode: {selectedMode === MODEL_MODES.STANDARD ? 'Standard' : 
@@ -496,6 +633,11 @@ const SpotterTMLOptimizer = () => {
                       <div className="text-left">
                         <p className="text-base font-semibold text-white">{tmlFile.name}</p>
                         <p className="text-xs text-gray-400">{(tmlFile.size / 1024).toFixed(2)} KB</p>
+                        {tmlParsedData && (
+                          <p className="text-xs text-ts-teal-400 mt-1">
+                            ✓ {tmlParsedData.totalColumns} columns, {tmlParsedData.totalFormulas} formulas detected
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -580,6 +722,37 @@ const SpotterTMLOptimizer = () => {
           </div>
         )}
 
+        {/* Analysis Progress Overlay */}
+        {analyzing && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <div className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 p-8 max-w-md w-full">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative mb-6">
+                  <Loader2 className="w-16 h-16 text-ts-orange-500 animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-ts-orange-400 animate-pulse" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Analysis in Progress</h2>
+                <p className="text-gray-300 mb-4">{analyzingMessage}</p>
+                <div className="w-full bg-gray-800 rounded-full h-2 mb-4">
+                  <div className="bg-ts-orange-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                </div>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <p>⏱️ This typically takes 2-4 minutes</p>
+                  <p>✨ We're analyzing every column in your TML file</p>
+                  <p>🎯 Generating Spotter-optimized recommendations</p>
+                </div>
+                <div className="mt-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                  <p className="text-xs text-blue-300">
+                    💡 <strong>Tip:</strong> The analysis is comprehensive and includes optimization suggestions for all columns, even those that don't need changes.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {results && (
           <div className="space-y-6">
             <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
@@ -617,6 +790,12 @@ const SpotterTMLOptimizer = () => {
                   <p className="text-sm text-ts-orange-400 mb-1 font-medium">Total Columns</p>
                   <p className="text-lg font-bold text-ts-orange-500">{results.totalColumns}</p>
                 </div>
+                {results.columnsNeedingAttention !== undefined && (
+                  <div className="p-4 bg-yellow-900/20 rounded-lg border border-yellow-500/30">
+                    <p className="text-sm text-yellow-400 mb-1 font-medium">Columns Needing Attention</p>
+                    <p className="text-lg font-bold text-yellow-400">{results.columnsNeedingAttention}</p>
+                  </div>
+                )}
               </div>
 
               {/* Model Purpose */}
@@ -640,10 +819,10 @@ const SpotterTMLOptimizer = () => {
                     <p className="text-sm text-blue-400 mb-1 font-medium">Needing Synonyms</p>
                     <p className="text-2xl font-bold text-blue-400">{results.statistics.needingSynonyms || 0}</p>
                   </div>
-                  {results.statistics.descriptionsOver200Chars !== undefined && (
+                  {results.statistics.descriptionsOver400Chars !== undefined && (
                     <div className="p-4 bg-orange-900/20 rounded-lg border border-orange-500/30">
-                      <p className="text-sm text-orange-400 mb-1 font-medium">Over 200 Chars</p>
-                      <p className="text-2xl font-bold text-orange-400">{results.statistics.descriptionsOver200Chars || 0}</p>
+                      <p className="text-sm text-orange-400 mb-1 font-medium">Over 400 Chars</p>
+                      <p className="text-2xl font-bold text-orange-400">{results.statistics.descriptionsOver400Chars || 0}</p>
                     </div>
                   )}
                   {results.statistics.synonymOverlapIssues !== undefined && (
@@ -665,6 +844,14 @@ const SpotterTMLOptimizer = () => {
               <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
                 <h2 className="text-2xl font-bold text-white mb-4">📚 Industry Context</h2>
                 <p className="text-gray-300 leading-relaxed">{results.industryContext}</p>
+              </div>
+            )}
+
+            {/* Business Question Alignment */}
+            {results.businessQuestionAlignment && (
+              <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
+                <h2 className="text-2xl font-bold text-white mb-4">🎯 Business Question Alignment</h2>
+                <p className="text-gray-300 leading-relaxed">{results.businessQuestionAlignment}</p>
               </div>
             )}
 
@@ -711,24 +898,24 @@ const SpotterTMLOptimizer = () => {
                 <div className="space-y-6">
                   {results.columnRecommendations.critical.map((col, idx) => (
                     <div key={idx} className="p-6 border-2 border-red-500/30 rounded-lg bg-red-900/10 shadow-md hover:shadow-lg hover:border-red-500/50 transition-all">
-                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
-                      <p className="text-gray-300 mb-4"><span className="font-semibold text-red-400">Issue:</span> {col.issue}</p>
+                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName || 'Unnamed Column'}</h3>
+                      <p className="text-gray-300 mb-4"><span className="font-semibold text-red-400">Issue:</span> {col.issue || 'No issue specified'}</p>
                       
-                      {col.recommendations.name && (
+                      {col.recommendations?.name && (
                         <div className="mb-3">
                           <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
                           <p className="text-white font-medium">{col.recommendations.name}</p>
                         </div>
                       )}
                       
-                      {col.recommendations.description && (
+                      {col.recommendations?.description && (
                         <div className="mb-3">
                           <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
                           <p className="text-gray-300">{col.recommendations.description}</p>
                         </div>
                       )}
                       
-                      {col.recommendations.synonyms && col.recommendations.synonyms.length > 0 && (
+                      {col.recommendations?.synonyms && col.recommendations.synonyms.length > 0 && (
                         <div className="mb-3">
                           <p className="text-sm text-ts-orange-400 font-semibold mb-2">Suggested Synonyms:</p>
                           <div className="flex flex-wrap gap-2">
@@ -741,7 +928,7 @@ const SpotterTMLOptimizer = () => {
                         </div>
                       )}
                       
-                      {col.recommendations.rationale && (
+                      {col.recommendations?.rationale && (
                         <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border-l-4 border-ts-teal-500">
                           <p className="text-sm text-ts-teal-400 font-semibold mb-1">Why This Matters:</p>
                           <p className="text-gray-300 text-sm">{col.recommendations.rationale}</p>
@@ -760,24 +947,24 @@ const SpotterTMLOptimizer = () => {
                 <div className="space-y-6">
                   {results.columnRecommendations.important.map((col, idx) => (
                     <div key={idx} className="p-6 border-2 border-yellow-500/30 rounded-lg bg-yellow-900/10 shadow-md hover:shadow-lg hover:border-yellow-500/50 transition-all">
-                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
-                      <p className="text-gray-300 mb-4"><span className="font-semibold text-yellow-400">Issue:</span> {col.issue}</p>
+                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName || 'Unnamed Column'}</h3>
+                      <p className="text-gray-300 mb-4"><span className="font-semibold text-yellow-400">Issue:</span> {col.issue || 'No issue specified'}</p>
                       
-                      {col.recommendations.name && (
+                      {col.recommendations?.name && (
                         <div className="mb-3">
                           <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
                           <p className="text-white font-medium">{col.recommendations.name}</p>
                         </div>
                       )}
                       
-                      {col.recommendations.description && (
+                      {col.recommendations?.description && (
                         <div className="mb-3">
                           <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
                           <p className="text-gray-300">{col.recommendations.description}</p>
                         </div>
                       )}
                       
-                      {col.recommendations.synonyms && col.recommendations.synonyms.length > 0 && (
+                      {col.recommendations?.synonyms && col.recommendations.synonyms.length > 0 && (
                         <div className="mb-3">
                           <p className="text-sm text-ts-orange-400 font-semibold mb-2">Suggested Synonyms:</p>
                           <div className="flex flex-wrap gap-2">
@@ -790,56 +977,7 @@ const SpotterTMLOptimizer = () => {
                         </div>
                       )}
                       
-                      {col.recommendations.rationale && (
-                        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border-l-4 border-ts-teal-500">
-                          <p className="text-sm text-ts-teal-400 font-semibold mb-1">Why This Matters:</p>
-                          <p className="text-gray-300 text-sm">{col.recommendations.rationale}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* NICE TO HAVE Priority */}
-            {results.columnRecommendations && results.columnRecommendations.niceToHave && results.columnRecommendations.niceToHave.length > 0 && (
-              <div className="bg-gray-900 rounded-xl shadow-2xl border border-green-500/30 p-8">
-                <h2 className="text-2xl font-bold text-green-400 mb-6">🟢 NICE TO HAVE - When Time Permits</h2>
-                <div className="space-y-6">
-                  {results.columnRecommendations.niceToHave.map((col, idx) => (
-                    <div key={idx} className="p-6 border-2 border-green-500/30 rounded-lg bg-green-900/10 shadow-md hover:shadow-lg hover:border-green-500/50 transition-all">
-                      <h3 className="text-xl font-semibold text-white mb-2">{col.columnName}</h3>
-                      <p className="text-gray-300 mb-4"><span className="font-semibold text-green-400">Issue:</span> {col.issue}</p>
-                      
-                      {col.recommendations.name && (
-                        <div className="mb-3">
-                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Recommended Name:</p>
-                          <p className="text-white font-medium">{col.recommendations.name}</p>
-                        </div>
-                      )}
-                      
-                      {col.recommendations.description && (
-                        <div className="mb-3">
-                          <p className="text-sm text-ts-orange-400 font-semibold mb-1">Description:</p>
-                          <p className="text-gray-300">{col.recommendations.description}</p>
-                        </div>
-                      )}
-                      
-                      {col.recommendations.synonyms && col.recommendations.synonyms.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-sm text-ts-orange-400 font-semibold mb-2">Suggested Synonyms:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {col.recommendations.synonyms.map((syn, synIdx) => (
-                              <span key={synIdx} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm border border-gray-700">
-                                {syn}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {col.recommendations.rationale && (
+                      {col.recommendations?.rationale && (
                         <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border-l-4 border-ts-teal-500">
                           <p className="text-sm text-ts-teal-400 font-semibold mb-1">Why This Matters:</p>
                           <p className="text-gray-300 text-sm">{col.recommendations.rationale}</p>
@@ -868,7 +1006,16 @@ const SpotterTMLOptimizer = () => {
             {/* Comparison Table */}
             {results.comparisonTable && results.comparisonTable.length > 0 && (
               <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 p-8">
-                <h2 className="text-2xl font-bold text-white mb-6">📋 Current vs Recommended Comparison</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">📋 Current vs Recommended Comparison</h2>
+                  <button
+                    onClick={exportComparisonTableToCSV}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold shadow-md shadow-green-600/20 hover:shadow-lg hover:shadow-green-600/30"
+                  >
+                    <Download className="w-5 h-5" />
+                    Export CSV
+                  </button>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="text-xs uppercase bg-gray-800 text-gray-400">
@@ -883,7 +1030,7 @@ const SpotterTMLOptimizer = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {results.comparisonTable.map((row, idx) => (
+                      {results.comparisonTable && results.comparisonTable.map((row, idx) => (
                         <tr key={idx} className={`border-b border-gray-700 ${
                           row.priority === 'Critical' ? 'bg-red-900/10' :
                           row.priority === 'Important' ? 'bg-yellow-900/10' :
@@ -895,11 +1042,11 @@ const SpotterTMLOptimizer = () => {
                               row.priority === 'Important' ? 'bg-yellow-500/20 text-yellow-400' :
                               'bg-green-500/20 text-green-400'
                             }`}>
-                              {row.priority === 'Critical' ? '🔴' : row.priority === 'Important' ? '🟡' : '🟢'} {row.priority}
+                              {row.priority === 'Critical' ? '🔴' : row.priority === 'Important' ? '🟡' : '🟢'} {row.priority || 'N/A'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 font-mono text-gray-400">{row.currentName}</td>
-                          <td className="px-4 py-3 font-semibold text-ts-teal-400">{row.recommendedName}</td>
+                          <td className="px-4 py-3 font-mono text-gray-400">{row.currentName || 'N/A'}</td>
+                          <td className="px-4 py-3 font-semibold text-ts-teal-400">{row.recommendedName || 'N/A'}</td>
                           <td className="px-4 py-3 text-gray-400 text-xs max-w-xs">
                             {row.currentDescription === 'None' || !row.currentDescription ? (
                               <span className="text-red-400 italic">Missing</span>
@@ -908,10 +1055,10 @@ const SpotterTMLOptimizer = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 text-gray-300 text-xs max-w-xs">
-                            {row.recommendedDescription}
+                            {row.recommendedDescription || 'N/A'}
                             {row.descriptionCharCount && (
                               <span className="block text-xs text-gray-500 mt-1">
-                                ({row.descriptionCharCount}/200 chars)
+                                ({row.descriptionCharCount}/400 chars)
                               </span>
                             )}
                           </td>
@@ -930,7 +1077,7 @@ const SpotterTMLOptimizer = () => {
                           </td>
                           <td className="px-4 py-3 text-xs">
                             <div className="flex flex-wrap gap-1">
-                              {row.recommendedSynonyms.map((syn, synIdx) => (
+                              {(Array.isArray(row.recommendedSynonyms) ? row.recommendedSynonyms : []).map((syn, synIdx) => (
                                 <span key={synIdx} className="px-2 py-0.5 bg-ts-orange-500/20 text-ts-orange-400 rounded text-xs">
                                   {syn}
                                 </span>
