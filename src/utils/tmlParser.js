@@ -7,9 +7,8 @@
 /**
  * Parse TML content and extract all column names from columns section
  * Supports formats like:
- * - columns: { names: "ColumnName" }
- * - columns: [ { names: "ColumnName" } ]
- * - columns:\n  - names: ColumnName
+ * - columns: [ { name: "ColumnName" } ]
+ * - columns:\n  - name: ColumnName
  * @param {string} tmlContent - The TML file content
  * @returns {Array<string>} - Array of column names
  */
@@ -34,7 +33,7 @@ export function parseTMLColumns(tmlContent) {
         inColumnsSection = true;
         currentIndent = lineIndent;
         
-        // Check for inline format: columns: { names: "..." }
+        // Check for inline format: columns: { name: "..." }
         const inlineMatch = trimmedLine.match(/columns:\s*\{/);
         if (inlineMatch) {
           braceDepth = 1;
@@ -57,8 +56,8 @@ export function parseTMLColumns(tmlContent) {
       if (inColumnsSection && braceDepth === 0) {
         if (trimmedLine && lineIndent <= currentIndent && 
             !trimmedLine.startsWith('-') && 
-            !trimmedLine.startsWith('names:') &&
-            !trimmedLine.match(/^\s*-\s*names:/) &&
+            !trimmedLine.startsWith('name:') &&
+            !trimmedLine.match(/^\s*-\s*name:/) &&
             trimmedLine.match(/^\w+:/) &&
             !trimmedLine.includes('columns')) {
           break;
@@ -66,15 +65,15 @@ export function parseTMLColumns(tmlContent) {
       }
       
       if (inColumnsSection) {
-        // Look for names: field in various formats
-        // Format 1: names: "ColumnName" or names: ColumnName
-        const nameMatch = line.match(/names:\s*(.+)$/);
+        // Look for name: field in various formats (NOT names: - that's wrong!)
+        // Format 1: name: "ColumnName" or name: ColumnName
+        const nameMatch = line.match(/\bname:\s*(.+)$/);
         if (nameMatch) {
-          const namesValue = nameMatch[1].trim();
+          const nameValue = nameMatch[1].trim();
           
-          // Handle array format: names: [col1, col2] or names: ["col1", "col2"]
-          if (namesValue.startsWith('[')) {
-            const arrayMatch = namesValue.match(/\[(.+)\]/);
+          // Handle array format: name: [col1, col2] or name: ["col1", "col2"]
+          if (nameValue.startsWith('[')) {
+            const arrayMatch = nameValue.match(/\[(.+)\]/);
             if (arrayMatch) {
               const names = arrayMatch[1]
                 .split(',')
@@ -83,21 +82,21 @@ export function parseTMLColumns(tmlContent) {
               columns.push(...names);
             }
           }
-          // Handle single quoted string: names: "ColumnName" or names: 'ColumnName'
-          else if (namesValue.match(/^["'].+["']$/)) {
-            columns.push(namesValue.replace(/^['"]|['"]$/g, ''));
+          // Handle single quoted string: name: "ColumnName" or name: 'ColumnName'
+          else if (nameValue.match(/^["'].+["']$/)) {
+            columns.push(nameValue.replace(/^['"]|['"]$/g, ''));
           }
-          // Handle unquoted: names: ColumnName
-          else if (namesValue && !namesValue.startsWith('{') && !namesValue.startsWith('[')) {
+          // Handle unquoted: name: ColumnName
+          else if (nameValue && !nameValue.startsWith('{') && !nameValue.startsWith('[')) {
             // Remove trailing commas or other JSON artifacts
-            const cleanName = namesValue.replace(/[,}\]]+$/, '').trim();
+            const cleanName = nameValue.replace(/[,}\]]+$/, '').trim();
             if (cleanName) columns.push(cleanName);
           }
         }
         
-        // Format 2: - names: ColumnName (list item format)
-        if (trimmedLine.startsWith('-') && trimmedLine.includes('names:')) {
-          const listMatch = trimmedLine.match(/names:\s*(.+)$/);
+        // Format 2: - name: ColumnName (list item format) - this is the most common!
+        if (trimmedLine.startsWith('-') && trimmedLine.includes('name:')) {
+          const listMatch = trimmedLine.match(/\bname:\s*(.+)$/);
           if (listMatch) {
             const name = listMatch[1].trim().replace(/['"]/g, '');
             if (name && !name.startsWith('{')) columns.push(name);
@@ -105,6 +104,8 @@ export function parseTMLColumns(tmlContent) {
         }
       }
     }
+    
+    console.log(`TML Parser: Found ${columns.length} columns in columns section`);
   } catch (error) {
     console.error('Error parsing TML columns:', error);
   }
@@ -193,6 +194,8 @@ export function parseTMLFormulas(tmlContent) {
         }
       }
     }
+    
+    console.log(`TML Parser: Found ${formulas.length} formulas in formulas section`);
   } catch (error) {
     console.error('Error parsing TML formulas:', error);
   }

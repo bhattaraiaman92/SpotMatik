@@ -309,18 +309,18 @@ const SpotterTMLOptimizer = () => {
                       const providers = Object.values(AI_PROVIDERS || {})
                         .filter(provider => provider !== AI_PROVIDERS?.AZURE_OPENAI && PROVIDER_INFO?.[provider]);
                       return providers.map((provider) => (
-                        <button
-                          key={provider}
-                          onClick={() => handleProviderChange(provider)}
-                          className={`p-4 rounded-lg border-2 transition-all text-left ${
-                            selectedProvider === provider
-                              ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
-                              : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
-                          }`}
-                        >
+                      <button
+                        key={provider}
+                        onClick={() => handleProviderChange(provider)}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          selectedProvider === provider
+                            ? 'border-ts-orange-500 bg-ts-orange-500/10 shadow-md shadow-ts-orange-500/20'
+                            : 'border-gray-700 hover:border-ts-orange-400 hover:bg-gray-800'
+                        }`}
+                      >
                           <div className="font-semibold text-white">{PROVIDER_INFO?.[provider]?.name || provider}</div>
                           <div className="text-xs text-gray-400 mt-1">{PROVIDER_INFO?.[provider]?.description || ''}</div>
-                        </button>
+                      </button>
                       ));
                     })()}
                   </div>
@@ -450,7 +450,7 @@ const SpotterTMLOptimizer = () => {
                     Get your API key from{' '}
                     <a 
                       href={PROVIDER_INFO[selectedProvider]?.consoleUrl || '#'}
-                      target="_blank"
+                      target="_blank" 
                       rel="noopener noreferrer"
                       className="text-ts-orange-500 hover:text-ts-orange-400 font-medium hover:underline"
                     >
@@ -486,7 +486,7 @@ const SpotterTMLOptimizer = () => {
                           onChange={(e) => setAzureEndpoint(e.target.value)}
                           placeholder="https://YOUR-RESOURCE-NAME.openai.azure.com"
                           className="w-full px-4 py-2 bg-gray-900 border-2 border-gray-700 text-white rounded-lg focus:border-ts-orange-500 focus:outline-none focus:ring-2 focus:ring-ts-orange-500/20 transition-all placeholder-gray-500 text-sm"
-                        />
+                    />
                         <p className="text-xs text-gray-500 mt-1">
                           Your Azure OpenAI resource endpoint URL
                         </p>
@@ -562,18 +562,18 @@ const SpotterTMLOptimizer = () => {
                     </div>
                   )}
                   
-                  <button
-                    onClick={() => {
-                      if (apiKey) {
-                        setShowApiKeyInput(false);
-                      } else {
-                        setError('Please enter an API key');
-                      }
-                    }}
+                    <button
+                      onClick={() => {
+                        if (apiKey) {
+                          setShowApiKeyInput(false);
+                        } else {
+                          setError('Please enter an API key');
+                        }
+                      }}
                     className="w-full px-6 py-2 bg-ts-orange-500 text-white rounded-lg font-semibold hover:bg-ts-orange-600 shadow-md shadow-ts-orange-500/20 hover:shadow-lg hover:shadow-ts-orange-500/30 transition-all transform hover:scale-105"
-                  >
-                    Save Key
-                  </button>
+                    >
+                      Save Key
+                    </button>
                 </div>
               </div>
             </div>
@@ -595,7 +595,7 @@ const SpotterTMLOptimizer = () => {
                   ({selectedProvider === AI_PROVIDERS.OPENAI && azureEndpoint 
                     ? (azureDeployments[selectedMode] || 'Not configured')
                     : selectedMode === MODEL_MODES.STANDARD 
-                      ? PROVIDER_INFO[selectedProvider].standardModel 
+                    ? PROVIDER_INFO[selectedProvider].standardModel 
                       : selectedMode === MODEL_MODES.ADVANCED
                       ? PROVIDER_INFO[selectedProvider].advancedModel
                       : selectedMode === MODEL_MODES.REASONING
@@ -626,11 +626,11 @@ const SpotterTMLOptimizer = () => {
               <label className="w-full cursor-pointer">
                 <div className={`border-3 border-dashed rounded-xl p-8 text-center transition-all ${
                   tmlFile ? 'border-ts-teal-500 bg-ts-teal-500/10' : 'border-ts-orange-500 bg-ts-orange-500/5 hover:bg-ts-orange-500/10 hover:border-ts-orange-400'
-                }`}>
+              }`}>
                   {tmlFile ? (
-                    <div className="flex items-center justify-center gap-3">
+                  <div className="flex items-center justify-center gap-3">
                       <FileText className="w-10 h-10 text-ts-teal-500" />
-                      <div className="text-left">
+                    <div className="text-left">
                         <p className="text-base font-semibold text-white">{tmlFile.name}</p>
                         <p className="text-xs text-gray-400">{(tmlFile.size / 1024).toFixed(2)} KB</p>
                         {tmlParsedData && (
@@ -638,25 +638,25 @@ const SpotterTMLOptimizer = () => {
                             ✓ {tmlParsedData.totalColumns} columns, {tmlParsedData.totalFormulas} formulas detected
                           </p>
                         )}
-                      </div>
                     </div>
-                  ) : (
-                    <>
+                  </div>
+                ) : (
+                  <>
                       <Upload className="w-12 h-12 mx-auto mb-3 text-ts-orange-500" />
                       <p className="text-lg font-semibold text-white mb-1">
                         Drop TML file here or click to browse
-                      </p>
+                    </p>
                       <p className="text-xs text-gray-400">Supports .tml, .yaml, .yml files</p>
-                    </>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  accept=".tml,.yaml,.yml"
+                  </>
+                )}
+              </div>
+              <input
+                type="file"
+                accept=".tml,.yaml,.yml"
                   onChange={handleTmlFileUpload}
-                  className="hidden"
-                />
-              </label>
+                className="hidden"
+              />
+            </label>
             </div>
 
             {/* Business Questions File Upload */}
