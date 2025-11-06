@@ -27,7 +27,7 @@ export const AI_MODELS = {
       presencePenalty: 0.0,
       frequencyPenalty: 0.0,
       responseFormat: 'json',
-      maxTokens: 12000
+      maxTokens: 16384  // Increased for large TML files
     }
   },
   [AI_PROVIDERS.AZURE_OPENAI]: {
@@ -49,7 +49,7 @@ export const AI_MODELS = {
     reasoningDefaults: {
       // Reasoning models (o1, o3) don't support temperature, top_p, system messages
       // o1/o3 models support up to 100K output tokens, using 64K for safety
-      maxCompletionTokens: 64000,        // Large output for comprehensive analysis
+      maxCompletionTokens: 16384,        // Large output for comprehensive analysis
       apiVersion: '2024-12-01-preview'
     }
   },
@@ -62,7 +62,7 @@ export const AI_MODELS = {
       temperature: 0.2,
       topP: 0.9,
       responseFormat: 'json',
-      maxTokens: 15000
+      maxTokens: 16384  // Increased for large TML files
     }
   },
   [AI_PROVIDERS.GEMINI]: {
@@ -74,7 +74,7 @@ export const AI_MODELS = {
       temperature: 0.35,
       topP: 0.9,
       responseMimeType: 'application/json',
-      maxTokens: 16000
+      maxTokens: 16384  // Increased for large TML files
     }
   }
 };
@@ -144,12 +144,131 @@ export function supportsReasoningModels(provider) {
   return provider === AI_PROVIDERS.AZURE_OPENAI;
 }
 
-// Simple JSON cleaner
+// Enhanced JSON parser with repair capabilities
 export function parseJSONSafely(text) {
+  if (!text || typeof text !== 'string') {
+    console.error('parseJSONSafely: Invalid input');
+    return null;
+  }
+
   try {
-    const clean = text.replace(/```(json)?/g, '').trim();
-    return JSON.parse(clean);
-  } catch {
+    // Remove markdown code blocks
+    let clean = text.replace(/```(json)?/g, '').trim();
+    
+    // Try parsing as-is first
+    try {
+      return JSON.parse(clean);
+    } catch (firstError) {
+      console.warn('Initial JSON parse failed, attempting repairs...', firstError.message);
+      
+      // Attempt 1: Remove any text before the first { or [
+      const jsonStart = Math.min(
+        clean.indexOf('{') >= 0 ? clean.indexOf('{') : Infinity,
+        clean.indexOf('[') >= 0 ? clean.indexOf('[') : Infinity
+      );
+      if (jsonStart !== Infinity && jsonStart > 0) {
+        clean = clean.substring(jsonStart);
+        try {
+          return JSON.parse(clean);
+        } catch (e) {
+          console.warn('Parse after trimming prefix failed:', e.message);
+        }
+      }
+      
+      // Attempt 2: Remove any text after the last } or ]
+      const lastBrace = clean.lastIndexOf('}');
+      const lastBracket = clean.lastIndexOf(']');
+      const jsonEnd = Math.max(lastBrace, lastBracket);
+      if (jsonEnd > 0) {
+        clean = clean.substring(0, jsonEnd + 1);
+        try {
+          return JSON.parse(clean);
+        } catch (e) {
+          console.warn('Parse after trimming suffix failed:', e.message);
+        }
+      }
+      
+      // Attempt 3: Fix common JSON issues
+      let fixAttempt = clean;
+      
+      // Remove trailing commas before closing brackets/braces
+      fixAttempt = fixAttempt.replace(/,(\s*[\]}])/g, '$1');
+      
+      // Remove any incomplete last entry (if it ends with comma and incomplete data)
+      // This handles cases where AI response was cut off mid-entry
+      if (fixAttempt.match(/,\s*[^,\{\[\}\]]*$/)) {
+        // Find the last complete entry before the trailing comma
+        const lastCompleteEntry = fixAttempt.lastIndexOf('}');
+        const lastCompleteArray = fixAttempt.lastIndexOf(']');
+        const cutoffPoint = Math.max(lastCompleteEntry, lastCompleteArray);
+        if (cutoffPoint > 0) {
+          fixAttempt = fixAttempt.substring(0, cutoffPoint + 1);
+        }
+      }
+      
+      // Count and balance brackets/braces
+      const openBraces = (fixAttempt.match(/\{/g) || []).length;
+      const closeBraces = (fixAttempt.match(/\}/g) || []).length;
+      const openBrackets = (fixAttempt.match(/\[/g) || []).length;
+      const closeBrackets = (fixAttempt.match(/\]/g) || []).length;
+      
+      // Add missing closing brackets
+      for (let i = 0; i < (openBrackets - closeBrackets); i++) {
+        fixAttempt += ']';
+      }
+      
+      // Add missing closing braces
+      for (let i = 0; i < (openBraces - closeBraces); i++) {
+        fixAttempt += '}';
+      }
+      
+      try {
+        const parsed = JSON.parse(fixAttempt);
+        console.log('Successfully repaired truncated JSON');
+        return parsed;
+      } catch (e) {
+        console.warn('JSON repair with balancing failed:', e.message);
+      }
+      
+      // Attempt 4: More aggressive cleanup - find last valid complete object
+      // Look for the pattern of complete entries ending with }] or }},
+      const completionPatterns = [
+        /\{[\s\S]*\}\s*\]\s*\}/g,  // Full object with arrays
+        /\{[\s\S]*\}\s*\}/g,        // Nested objects
+        /\{[\s\S]*\]/g              // Object with array
+      ];
+      
+      for (const pattern of completionPatterns) {
+        const matches = clean.match(pattern);
+        if (matches && matches.length > 0) {
+          const longestMatch = matches.reduce((a, b) => a.length > b.length ? a : b);
+          try {
+            const parsed = JSON.parse(longestMatch);
+            console.log('Successfully extracted valid JSON using pattern matching');
+            return parsed;
+          } catch (e) {
+            // Continue to next pattern
+          }
+        }
+      }
+      
+      // Attempt 5: Try to extract and parse the largest valid JSON object
+      const objectRegex = /\{[\s\S]*\}/;
+      const match = clean.match(objectRegex);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch (e) {
+          console.warn('Regex extraction parse failed:', e.message);
+        }
+      }
+      
+      // If all repair attempts fail, throw the original error
+      console.error('All JSON repair attempts failed');
+      throw firstError;
+    }
+  } catch (error) {
+    console.error('JSON parsing completely failed:', error.message);
     return null;
   }
 }
@@ -200,22 +319,6 @@ Example:
 
 CURRENT: "Sales data model"
 RECOMMENDED: "This model enables the retail sales team to explore performance trends, revenue drivers, and product-level insights across time and regions. It supports analysis of customer behavior, discount impacts, and campaign performance for strategic decision-making."
-
-Model-Level Instructions
-
-Recommend 3–5 clear model-level guidance rules to improve Spotter’s interpretation.
-
-Examples:
-
-"If no date range specified, default to the last 90 days."
-
-"Exclude test or internal transactions where Account_Type = 'Test'."
-
-"Use Net_Revenue when calculating total sales (includes discounts and returns)."
-
-"For customer metrics, always use unique Customer_ID."
-
-"Prefer Region_Name for geographic analysis."
 
 STEP 3: Column-Level Analysis
 
@@ -319,13 +422,6 @@ The JSON structure must follow this exact format:
     "current": "string - existing description or 'None'",
     "recommended": "string - improved 2–3 sentence version"
   },
-  "modelInstructions": [
-    "string - instruction 1",
-    "string - instruction 2",
-    "string - instruction 3",
-    "string - instruction 4",
-    "string - instruction 5"
-  ],
   "columnRecommendations": {
     "critical": [
       {
@@ -384,15 +480,7 @@ The JSON structure must follow this exact format:
     "synonymOverlapIssues": number,
     "impactLevel": "High|Medium|Low"
   },
-  "quickWins": [
-    "string - quick win 1",
-    "string - quick win 2",
-    "string - quick win 3",
-    "string - quick win 4",
-    "string - quick win 5"
-  ],
-  "industryContext": "string - relevant industry KPIs, naming standards, and terminology insights",
-  "businessQuestionAlignment": "string - summary of how the model columns support business questions (from provided file or inferred), including coverage gaps or strong matches"
+  "industryContext": "string - relevant industry KPIs, naming standards, and terminology insights"
 }
 
 ADDITIONAL REQUIREMENTS
@@ -408,15 +496,27 @@ CRITICAL REQUIREMENTS FOR comparisonTable:
 3. For columns that are already optimized (no changes needed):
    - Set priority to "No Change Needed"
    - Set recommendedName to the same as currentName
-   - STILL provide recommendedDescription (even if current description exists, optimize it for Spotter)
+   - CRITICALLY IMPORTANT: ALWAYS provide a MEANINGFUL, CONTEXTUAL recommendedDescription
+     * DO NOT use generic placeholders like "Column representing X. Optimized for Spotter..."
+     * DO provide specific, business-context-aware descriptions that explain:
+       - What the column represents in business terms
+       - How it's used in analysis or queries
+       - Any important context about values, calculations, or relationships
+       - Relevance to the industry and business function
+     * Example GOOD: "Total revenue generated from customer subscriptions in the current fiscal period, excluding one-time charges and fees. Use for revenue trend analysis and forecasting."
+     * Example BAD: "Column representing revenue. Optimized for Spotter natural language queries."
    - STILL provide recommendedSynonyms (at least 3-5 synonyms, even if current synonyms exist)
-   - This ensures ALL columns have Spotter-optimized descriptions and synonyms
+   - This ensures ALL columns have high-quality, Spotter-optimized descriptions and synonyms
 
 4. Every row in comparisonTable MUST have:
    - currentName (exact column name from TML)
    - recommendedName (improved name or same as currentName)
    - currentDescription (existing description or 'None')
-   - recommendedDescription (ALWAYS provide, even if no change needed - optimize for Spotter)
+   - recommendedDescription (ALWAYS provide a MEANINGFUL, CONTEXT-RICH description - NEVER use generic templates)
+     * Must be specific to the column's business purpose and use case
+     * Should help Spotter understand what the column means and how it's queried
+     * Include business context, not just technical details
+     * 200-400 characters recommended for comprehensive context
    - currentSynonyms (existing synonyms array or 'None')
    - recommendedSynonyms (ALWAYS provide array with 3-5 synonyms, even if no change needed)
    - priority (Critical|Important|Nice to Have|No Change Needed)
@@ -439,5 +539,32 @@ Provide complete, actionable recommendations — not generic placeholders. Never
 Use natural, business-friendly phrasing aligned with how users speak and query.
 
 Prioritize relevance to natural language search accuracy.
+
+❌ FORBIDDEN PATTERNS FOR DESCRIPTIONS - DO NOT USE THESE:
+- "Column representing [name]. Optimized for Spotter natural language queries."
+- "Column representing [name]. Optimized for Spotter natural language queries to improve search accuracy and user experience."
+- "Description needed for Spotter optimization."
+- Any generic template that just restates the column name
+
+✅ REQUIRED PATTERN FOR DESCRIPTIONS:
+Every description MUST include:
+1. WHAT it represents in business terms (not just technical name)
+2. HOW it's used (analysis, filtering, reporting)
+3. WHY it matters (business context, decision-making)
+4. WHEN relevant, what values/patterns to expect
+
+Example descriptions by industry:
+
+RETAIL:
+- Bad: "Column representing total sales. Optimized for Spotter natural language queries."
+- Good: "Total sales revenue including all transaction types (in-store, online, mobile) after returns and discounts. Used for daily sales reporting, trend analysis, and store performance comparisons. Key metric for revenue forecasting."
+
+FINANCE:
+- Bad: "Column representing account balance. Optimized for Spotter natural language queries."
+- Good: "Current account balance reflecting all posted transactions as of the last business day. Includes deposits, withdrawals, fees, and interest. Used for account status inquiries, overdraft monitoring, and customer service."
+
+SAAS:
+- Bad: "Column representing MRR. Optimized for Spotter natural language queries."
+- Good: "Monthly Recurring Revenue from active subscriptions, normalized to a monthly value. Excludes one-time fees and usage overages. Primary metric for subscription business health and growth tracking."
 
 Remember: Return ONLY valid JSON. No markdown, no code blocks, no additional text. The response must be parseable JSON.`;

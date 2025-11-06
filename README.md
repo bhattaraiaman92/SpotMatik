@@ -130,6 +130,33 @@ These models work differently than standard models:
 
 ## Troubleshooting
 
+### JSON Parsing Errors
+
+If you encounter a JSON parsing error like:
+```
+Error analyzing TML file: Failed to parse AI response: Expected ',' or ']' after array element
+```
+
+**Quick Fixes:**
+1. **Switch to Advanced Mode**: Use "Advanced" instead of "Standard" for better JSON generation
+2. **Try Different Provider**: OpenAI generally handles large outputs most reliably
+3. **Check TML Size**: Files with 200+ columns may need to be split into smaller sections
+4. **See Detailed Guide**: Check [TROUBLESHOOTING_JSON_ERRORS.md](./TROUBLESHOOTING_JSON_ERRORS.md) for comprehensive solutions
+
+**What We've Done:**
+- ✅ Enhanced JSON parser with automatic repair capabilities
+- ✅ Increased token limits by 25-33% across all providers
+- ✅ Added 5 fallback strategies for handling malformed JSON
+- ✅ Improved error messages with actionable suggestions
+- ✅ Enhanced description quality - no more generic placeholders
+- ✅ LLM now generates meaningful, contextual descriptions for ALL columns
+- ✅ Optimized output to reduce token usage by ~1,500-2,500 tokens
+- ✅ Removed non-essential sections to focus on core column optimization
+- ✅ Simplified priority sections to compact tables (saves 15,000-24,000+ tokens)
+- ✅ Focused display on comprehensive comparison table with full details
+
+See [JSON_PARSING_FIX.md](./JSON_PARSING_FIX.md), [DESCRIPTION_QUALITY_FIX.md](./DESCRIPTION_QUALITY_FIX.md), [TOKEN_OPTIMIZATION.md](./TOKEN_OPTIMIZATION.md), and [OUTPUT_SIMPLIFICATION.md](./OUTPUT_SIMPLIFICATION.md) for technical details.
+
 ### Claude CORS Error
 
 If you see this error:

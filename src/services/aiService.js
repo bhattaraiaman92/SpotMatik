@@ -53,10 +53,31 @@ export class AIService {
         }
 
         // description: always provide, even if empty
+        // Note: This is a FALLBACK only. The LLM should always provide meaningful descriptions.
         if (!rec.description) {
-          rec.description = item.columnName 
-            ? `Column representing ${item.columnName.toLowerCase().replace(/_/g, ' ')}.`
-            : 'Description needed for Spotter optimization.';
+          console.warn(
+            `[${this.constructor.name}] Missing description in recommendations for column: ${item.columnName}. ` +
+            `The LLM should have provided this.`
+          );
+          
+          const columnName = item.columnName || 'Unknown';
+          const readableName = columnName.toLowerCase().replace(/_/g, ' ');
+          
+          // Generate slightly more contextual fallback
+          let contextHint = '';
+          if (columnName.match(/date|time|timestamp/i)) {
+            contextHint = ' temporal field for time-based analysis';
+          } else if (columnName.match(/id|key/i)) {
+            contextHint = ' identifier for data relationships';
+          } else if (columnName.match(/amount|revenue|cost|price/i)) {
+            contextHint = ' financial metric for calculations';
+          } else if (columnName.match(/count|quantity|number/i)) {
+            contextHint = ' numeric value for aggregations';
+          } else if (columnName.match(/status|state|flag/i)) {
+            contextHint = ' status field for filtering';
+          }
+          
+          rec.description = `${readableName.charAt(0).toUpperCase() + readableName.slice(1)}${contextHint ? ' -' + contextHint : ''}. Requires review for specific business context.`;
         }
 
         // synonyms: always provide array with at least columnName variations
@@ -99,9 +120,7 @@ export class AIService {
         currentName: row.currentName || 'Unknown Column',
         recommendedName: row.recommendedName || row.currentName || 'Unknown Column',
         currentDescription: row.currentDescription || 'None',
-        recommendedDescription: row.recommendedDescription || (row.currentName 
-          ? `Column representing ${row.currentName.toLowerCase().replace(/_/g, ' ')}. Optimized for Spotter natural language queries.`
-          : 'Description needed for Spotter optimization.'),
+        recommendedDescription: row.recommendedDescription || null, // Will be set later with better logic
         currentSynonyms: row.currentSynonyms === 'None' || !row.currentSynonyms 
           ? 'None' 
           : (Array.isArray(row.currentSynonyms) ? row.currentSynonyms : []),
@@ -140,10 +159,38 @@ export class AIService {
       }
 
       // Ensure recommendedDescription is always provided and not empty
+      // Note: This is a FALLBACK only. The LLM should always provide meaningful descriptions.
       if (!normalizedRow.recommendedDescription || normalizedRow.recommendedDescription === 'None') {
-        normalizedRow.recommendedDescription = normalizedRow.currentName 
-          ? `Column representing ${normalizedRow.currentName.toLowerCase().replace(/_/g, ' ')}. Optimized for Spotter natural language queries to improve search accuracy and user experience.`
-          : 'Description needed for Spotter optimization. Provides context for natural language query interpretation.';
+        console.warn(
+          `[${this.constructor.name}] Missing recommendedDescription for column: ${normalizedRow.currentName}. ` +
+          `Using fallback description. The LLM should have provided this.`
+        );
+        
+        // Generate a more contextual fallback based on column name patterns
+        const columnName = normalizedRow.currentName || 'Unknown';
+        const readableName = columnName.toLowerCase().replace(/_/g, ' ');
+        
+        // Try to infer type/purpose from column name
+        let contextHint = '';
+        if (columnName.match(/date|time|timestamp|created|updated|modified/i)) {
+          contextHint = ' Used for temporal analysis and time-based filtering.';
+        } else if (columnName.match(/id|key|code/i)) {
+          contextHint = ' Unique identifier used for joining and referencing related data.';
+        } else if (columnName.match(/name|title|description/i)) {
+          contextHint = ' Descriptive text field used for display and search.';
+        } else if (columnName.match(/amount|revenue|cost|price|value|total|sum/i)) {
+          contextHint = ' Numeric value used for calculations and aggregations in financial analysis.';
+        } else if (columnName.match(/count|quantity|number|num/i)) {
+          contextHint = ' Numeric count used for aggregation and metrics.';
+        } else if (columnName.match(/status|state|flag|is_|has_/i)) {
+          contextHint = ' Status indicator used for filtering and categorization.';
+        } else if (columnName.match(/percent|rate|ratio/i)) {
+          contextHint = ' Percentage or ratio metric used for comparative analysis.';
+        }
+        
+        normalizedRow.recommendedDescription = 
+          `${readableName.charAt(0).toUpperCase() + readableName.slice(1)} field in this data model.${contextHint} ` +
+          `Review TML file for specific business context and usage patterns.`;
       }
 
       // Ensure descriptionCharCount is set
@@ -174,7 +221,28 @@ export class AIService {
         
         // Add missing entries to comparison table
         missingNames.forEach(name => {
-          const recommendedDesc = `Column representing ${name.toLowerCase().replace(/_/g, ' ')}. Optimized for Spotter natural language queries.`;
+          const readableName = name.toLowerCase().replace(/_/g, ' ');
+          
+          // Generate contextual description based on column name patterns
+          let contextHint = '';
+          if (name.match(/date|time|timestamp|created|updated|modified/i)) {
+            contextHint = ' Used for temporal analysis and time-based filtering.';
+          } else if (name.match(/id|key|code/i)) {
+            contextHint = ' Unique identifier used for joining and referencing related data.';
+          } else if (name.match(/name|title|description/i)) {
+            contextHint = ' Descriptive text field used for display and search.';
+          } else if (name.match(/amount|revenue|cost|price|value|total|sum/i)) {
+            contextHint = ' Numeric value used for calculations and aggregations in financial analysis.';
+          } else if (name.match(/count|quantity|number|num/i)) {
+            contextHint = ' Numeric count used for aggregation and metrics.';
+          } else if (name.match(/status|state|flag|is_|has_/i)) {
+            contextHint = ' Status indicator used for filtering and categorization.';
+          } else if (name.match(/percent|rate|ratio/i)) {
+            contextHint = ' Percentage or ratio metric used for comparative analysis.';
+          }
+          
+          const recommendedDesc = `${readableName.charAt(0).toUpperCase() + readableName.slice(1)} field in this data model.${contextHint} Review TML file for specific business context and usage patterns.`;
+          
           json.comparisonTable.push({
             currentName: name,
             recommendedName: name,
@@ -263,18 +331,48 @@ export class AIService {
    */
   parseResponse(responseText) {
     try {
+      // Log response info for debugging
+      console.log(`[${this.constructor.name}] Response length: ${responseText.length} characters`);
+      
       // First try the safe JSON parser
       const parsed = parseJSONSafely(responseText);
-      if (parsed) return parsed;
+      if (parsed) {
+        console.log(`[${this.constructor.name}] Successfully parsed JSON response`);
+        return parsed;
+      }
 
       // Fallback to regex extraction
       let jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('No valid JSON found in response');
+        console.error(`[${this.constructor.name}] No JSON object found in response`);
+        console.error('Response preview:', responseText.substring(0, 500));
+        throw new Error('No valid JSON found in response. The AI may have returned plain text instead of JSON.');
       }
-      return JSON.parse(jsonMatch[0]);
+      
+      const parsedFromRegex = JSON.parse(jsonMatch[0]);
+      console.log(`[${this.constructor.name}] Successfully parsed JSON using regex extraction`);
+      return parsedFromRegex;
+      
     } catch (error) {
-      throw new Error(`Failed to parse AI response: ${error.message}`);
+      console.error(`[${this.constructor.name}] JSON parsing failed:`, error);
+      
+      // Provide helpful error message based on the error type
+      let helpfulMessage = error.message;
+      
+      if (error.message.includes('position') && error.message.includes('JSON')) {
+        helpfulMessage = `${error.message}\n\nThis usually means:\n` +
+          `1. The response was truncated due to token limits\n` +
+          `2. The AI generated malformed JSON\n\n` +
+          `Try using the 'Advanced' model mode for larger TML files, or break your TML into smaller sections.`;
+      }
+      
+      // Log a snippet of the response for debugging
+      if (responseText && responseText.length > 0) {
+        const snippet = responseText.substring(Math.max(0, responseText.length - 500));
+        console.error('Response tail (last 500 chars):', snippet);
+      }
+      
+      throw new Error(`Failed to parse AI response: ${helpfulMessage}`);
     }
   }
 
